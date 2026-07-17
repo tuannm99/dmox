@@ -1,6 +1,7 @@
 package index
 
 import (
+	"log"
 	"regexp"
 	"strings"
 
@@ -20,7 +21,9 @@ func Parse(raw []byte, fallbackTitle string) ParsedDoc {
 	content := string(raw)
 	fm := map[string]any{}
 	if m := frontmatterRe.FindStringSubmatch(content); m != nil {
-		_ = yaml.Unmarshal([]byte(m[1]), &fm)
+		if err := yaml.Unmarshal([]byte(m[1]), &fm); err != nil {
+			log.Printf("index: malformed frontmatter, indexing with raw content: %v", err)
+		}
 		content = content[len(m[0]):]
 	}
 	title := fallbackTitle

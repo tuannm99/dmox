@@ -40,6 +40,28 @@ func TestParse_FrontmatterAndFallbackTitle(t *testing.T) {
 	}
 }
 
+func TestParse_MalformedFrontmatterLogsWarningAndFallsBackToRawContent(t *testing.T) {
+	// Test with malformed YAML frontmatter (unterminated list)
+	malformedYAML := "---\ntitle: [unterminated\n---\n# Heading\nThis is the body"
+	doc := Parse([]byte(malformedYAML), "fallback.md")
+
+	// Verify that parsing continues despite YAML error (best-effort behavior)
+	// When frontmatter fails to parse, title should fall back to heading
+	if doc.Title != "Heading" {
+		t.Fatalf("Title = %q, want 'Heading' (should use heading fallback after malformed YAML)", doc.Title)
+	}
+
+	// Verify the body is still indexed and usable (raw content after frontmatter block removed)
+	if doc.Body != "This is the body" {
+		t.Fatalf("Body = %q, want 'This is the body'", doc.Body)
+	}
+
+	// Verify the frontmatter map is empty because YAML parsing failed
+	if len(doc.Frontmatter) != 0 {
+		t.Fatalf("Frontmatter = %+v, want empty map", doc.Frontmatter)
+	}
+}
+
 func TestIsAIContextFile(t *testing.T) {
 	cases := map[string]bool{
 		"CLAUDE.md":              true,
