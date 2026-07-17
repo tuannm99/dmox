@@ -142,3 +142,97 @@ func TestAPI_CORSHeaders(t *testing.T) {
 		t.Fatalf("missing CORS header")
 	}
 }
+
+func TestAPI_Search(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/workspaces/ws/search?q=getting+started")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var results []map[string]any
+	json.NewDecoder(resp.Body).Decode(&results)
+	if len(results) != 1 || results[0]["path"] != "guide.md" {
+		t.Fatalf("results = %+v", results)
+	}
+}
+
+func TestAPI_AIContext(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/workspaces/ws/ai-context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var entries []map[string]any
+	json.NewDecoder(resp.Body).Decode(&entries)
+	if len(entries) != 1 || entries[0]["path"] != "CLAUDE.md" {
+		t.Fatalf("entries = %+v", entries)
+	}
+}
+
+func TestAPI_GitHistory_NotApplicableForLocalSource(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/workspaces/ws/git/history?path=local/guide.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	json.NewDecoder(resp.Body).Decode(&out)
+	if out["applicable"] != false {
+		t.Fatalf("applicable = %v, want false for a local source", out["applicable"])
+	}
+}
+
+func TestAPI_GitBlame_NotApplicableForLocalSource(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/workspaces/ws/git/blame?path=local/guide.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	json.NewDecoder(resp.Body).Decode(&out)
+	if out["applicable"] != false {
+		t.Fatalf("applicable = %v, want false for a local source", out["applicable"])
+	}
+}
+
+func TestAPI_SourcePull_ResyncsAndReindexes(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/api/sources/local/pull", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_SourcePull_UnknownSource(t *testing.T) {
+	a := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(a))
+	defer srv.Close()
+
+	resp, _ := http.Post(srv.URL+"/api/sources/nope/pull", "application/json", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
