@@ -8,6 +8,7 @@ import (
 )
 
 func NewRouter(a *app.App) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery(), gin.Logger(), corsMiddleware())
 	g := r.Group("/api")
