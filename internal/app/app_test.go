@@ -88,3 +88,70 @@ func TestApp_New_RejectsUnknownSourceType(t *testing.T) {
 		t.Fatal("expected error for unknown source type")
 	}
 }
+
+func TestApp_SyncAndIndexAll_FailFastAbortsOnFirstError(t *testing.T) {
+	nonexistentPath := "/nonexistent/path/that/does/not/exist"
+	cfg := &config.Config{
+		DataDir: t.TempDir(),
+		Server:  config.ServerConfig{Addr: ":0"},
+		Embeddings: config.EmbeddingsConfig{Provider: "none"},
+		Workspaces: []config.Workspace{
+			{ID: "ws", Name: "WS", Sources: []config.Source{
+				{ID: "local", Type: "local", Path: nonexistentPath},
+			}},
+		},
+	}
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer a.Close()
+
+	err = a.SyncAndIndexAll(context.Background(), true)
+	if err == nil {
+		t.Fatal("expected error for nonexistent source path with failFast=true")
+	}
+}
+
+func TestApp_SyncAndIndexAll_DegradesGracefullyWhenNotFailFast(t *testing.T) {
+	// Create one valid directory with a markdown file
+	validDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(validDir, "file.md"), []byte("# Content\nhello world"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Use a nonexistent path for the second source
+	nonexistentPath := "/nonexistent/path/that/does/not/exist"
+
+	cfg := &config.Config{
+		DataDir: t.TempDir(),
+		Server:  config.ServerConfig{Addr: ":0"},
+		Embeddings: config.EmbeddingsConfig{Provider: "none"},
+		Workspaces: []config.Workspace{
+			{ID: "ws", Name: "WS", Sources: []config.Source{
+				{ID: "broken", Type: "local", Path: nonexistentPath},
+				{ID: "healthy", Type: "local", Path: validDir},
+			}},
+		},
+	}
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer a.Close()
+
+	// Call with failFast=false; should not return an error
+	err = a.SyncAndIndexAll(context.Background(), false)
+	if err != nil {
+		t.Fatalf("SyncAndIndexAll with failFast=false returned error: %v", err)
+	}
+
+	// Verify the healthy source's file was indexed
+	var count int
+	if err := a.Store.DB().QueryRow(`SELECT COUNT(*) FROM files WHERE workspace_id='ws' AND source_id='healthy'`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("indexed row count for healthy source = %d, want 1", count)
+	}
+}
