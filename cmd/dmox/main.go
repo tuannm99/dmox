@@ -56,11 +56,3 @@ Usage:
 func runBuildCmd(args []string) {
 	log.Fatal("build command not yet implemented")
 }
-
-func runTreeCmd(args []string) {
-	log.Fatal("tree command not yet implemented")
-}
-
-func runContextCmd(args []string) {
-	log.Fatal("context command not yet implemented")
-}
