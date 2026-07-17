@@ -39,7 +39,7 @@ func (s *Service) History(mirrorDir, path string, limit int) ([]Commit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve head: %w", err)
 	}
-	iter, err := repo.Log(&git.LogOptions{From: head.Hash(), FileName: &path})
+	iter, err := repo.Log(&git.LogOptions{From: head.Hash(), FileName: &path, Order: git.LogOrderCommitterTime})
 	if err != nil {
 		return nil, fmt.Errorf("log %s: %w", path, err)
 	}

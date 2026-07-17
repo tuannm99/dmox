@@ -71,7 +71,46 @@ func TestService_History_RespectsLimit(t *testing.T) {
 }
 
 func TestService_Blame(t *testing.T) {
-	dir := initRepoWithHistory(t)
+	// Setup repo with tracked commits
+	dir := t.TempDir()
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initial commit: both lines
+	if err := os.WriteFile(filepath.Join(dir, "guide.md"), []byte("line one\nline two\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wt.Add("guide.md"); err != nil {
+		t.Fatal(err)
+	}
+	hash1, err := wt.Commit("initial commit", &git.CommitOptions{
+		Author: &object.Signature{Name: "Test", Email: "test@example.com"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Second commit: edit line two
+	if err := os.WriteFile(filepath.Join(dir, "guide.md"), []byte("line one\nline two edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wt.Add("guide.md"); err != nil {
+		t.Fatal(err)
+	}
+	hash2, err := wt.Commit("edit line two", &git.CommitOptions{
+		Author: &object.Signature{Name: "Test", Email: "test@example.com"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test blame attribution
 	svc := New()
 	lines, err := svc.Blame(dir, "guide.md")
 	if err != nil {
@@ -82,5 +121,12 @@ func TestService_Blame(t *testing.T) {
 	}
 	if lines[1].Text != "line two edited" {
 		t.Fatalf("lines[1].Text = %q", lines[1].Text)
+	}
+	// Verify per-line commit attribution
+	if lines[0].Hash != hash1.String() {
+		t.Fatalf("lines[0].Hash = %q, want %q (initial commit)", lines[0].Hash, hash1.String())
+	}
+	if lines[1].Hash != hash2.String() {
+		t.Fatalf("lines[1].Hash = %q, want %q (second commit)", lines[1].Hash, hash2.String())
 	}
 }
