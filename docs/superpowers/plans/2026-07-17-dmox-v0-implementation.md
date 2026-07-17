@@ -787,6 +787,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -915,6 +916,11 @@ func debounceWatch(ctx context.Context, w *fsnotify.Watcher, root string, out ch
 		select {
 		case <-ctx.Done():
 			return
+		case err, ok := <-w.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("source: watcher error: %v", err)
 		case ev, ok := <-w.Events:
 			if !ok {
 				return
