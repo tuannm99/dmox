@@ -55,30 +55,41 @@ func (m *Manager) Subscribe() <-chan *Config {
 
 func (m *Manager) watchLoop() {
 	target, _ := filepath.Abs(m.path)
-	for event := range m.watcher.Events {
-		evPath, _ := filepath.Abs(event.Name)
-		if evPath != target {
-			continue
-		}
-		if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
-			continue
-		}
-		cfg, err := Load(m.path)
-		if err != nil {
-			log.Printf("config: reload failed, keeping previous config: %v", err)
-			continue
-		}
-		m.mu.Lock()
-		m.cfg = cfg
-		m.mu.Unlock()
-		m.subsMu.Lock()
-		for _, ch := range m.subs {
-			select {
-			case ch <- cfg:
-			default:
+	for {
+		select {
+		case event, ok := <-m.watcher.Events:
+			if !ok {
+				return
 			}
+			evPath, _ := filepath.Abs(event.Name)
+			if evPath != target {
+				continue
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+				continue
+			}
+			cfg, err := Load(m.path)
+			if err != nil {
+				log.Printf("config: reload failed, keeping previous config: %v", err)
+				continue
+			}
+			m.mu.Lock()
+			m.cfg = cfg
+			m.mu.Unlock()
+			m.subsMu.Lock()
+			for _, ch := range m.subs {
+				select {
+				case ch <- cfg:
+				default:
+				}
+			}
+			m.subsMu.Unlock()
+		case err, ok := <-m.watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("config: watcher error: %v", err)
 		}
-		m.subsMu.Unlock()
 	}
 }
 
