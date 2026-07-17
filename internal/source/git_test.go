@@ -123,3 +123,50 @@ func TestGitSource_ListAndPathEscape(t *testing.T) {
 		t.Fatal("expected path escape error")
 	}
 }
+
+func TestGitSource_RecoverFromPartialClone(t *testing.T) {
+	originDir, _ := newOriginRepo(t)
+	dataDir := t.TempDir()
+	s := NewGitSource("repo", "file://"+originDir, "master", dataDir)
+	ctx := context.Background()
+
+	// Simulate a failed prior clone attempt by pre-creating the mirror directory
+	// with a stray file (non-git tree), so .git does not exist.
+	if err := os.MkdirAll(s.MirrorDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	strayFile := filepath.Join(s.MirrorDir(), "stray.txt")
+	if err := os.WriteFile(strayFile, []byte("leftover from failed clone"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the stray file exists and .git does not (confirming the partial state).
+	if _, err := os.Stat(strayFile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(s.MirrorDir(), ".git")); !os.IsNotExist(err) {
+		t.Fatal("expected .git to not exist in partial clone state")
+	}
+
+	// Now Sync() should recover: remove the partial content and clone successfully.
+	if err := s.Sync(ctx); err != nil {
+		t.Fatalf("Sync (recovery from partial clone): %v", err)
+	}
+
+	// Verify the mirror is now a valid git repository with expected content.
+	if _, err := os.Stat(filepath.Join(s.MirrorDir(), ".git")); err != nil {
+		t.Fatalf("expected .git directory after successful clone: %v", err)
+	}
+	if _, err := os.Stat(strayFile); !os.IsNotExist(err) {
+		t.Fatal("expected stray file to be removed during recovery")
+	}
+
+	// Verify we can read the expected file.
+	content, err := s.Read(ctx, "guide.md")
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if string(content) != "# Guide v1" {
+		t.Fatalf("content = %q, want v1", content)
+	}
+}

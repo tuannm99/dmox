@@ -39,6 +39,11 @@ func (s *GitSource) Sync(ctx context.Context) error {
 }
 
 func (s *GitSource) clone(ctx context.Context) error {
+	// Remove any pre-existing content at mirrorDir (from a failed prior clone attempt)
+	// to ensure clone() always starts from a guaranteed-empty target.
+	if err := os.RemoveAll(s.mirrorDir); err != nil {
+		return fmt.Errorf("git source %s: remove pre-existing mirror: %w", s.id, err)
+	}
 	_, err := git.PlainCloneContext(ctx, s.mirrorDir, false, &git.CloneOptions{
 		URL:           s.url,
 		ReferenceName: plumbing.NewBranchReferenceName(s.branch),
