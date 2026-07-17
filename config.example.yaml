@@ -1,0 +1,23 @@
+workspaces:
+  - id: docs
+    name: "Docs"
+    sources:
+      - id: local-docs
+        type: local
+        path: ./docs
+      - id: repo-a
+        type: git
+        url: https://github.com/example/repo-a.git
+        branch: main
+        embeddings:
+          enabled: false
+embeddings:
+  provider: none # none | openai
+  api_key_env: OPENAI_API_KEY
+  model: text-embedding-3-small
+render:
+  plantuml:
+    jar_path: "" # optional path to plantuml.jar; empty disables PlantUML rendering
+server:
+  addr: ":8080"
+data_dir: "" # defaults to ~/.dmox
