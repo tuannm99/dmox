@@ -3,18 +3,18 @@ import { createStaticDataSource } from './staticDataSource';
 
 describe('createStaticDataSource', () => {
   beforeEach(() => {
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   it('reads the file JSON from a path-encoded location under the base path', async () => {
-    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => ({ path: 'local/a.md' }) });
+    (globalThis.fetch as any).mockResolvedValue({ ok: true, json: async () => ({ path: 'local/a.md' }) });
     const ds = createStaticDataSource('/base/');
     await ds.getFile('ws', 'local/a.md');
-    expect(global.fetch).toHaveBeenCalledWith('/base/data/files/local/a.md.json');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/base/data/files/local/a.md.json');
   });
 
   it('filters the pre-built search index client-side', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (globalThis.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => [
         { workspace_id: 'ws', source_id: 'local', path: 'a.md', title: 'Alpha', snippet: 'alpha content', score: 0 },
