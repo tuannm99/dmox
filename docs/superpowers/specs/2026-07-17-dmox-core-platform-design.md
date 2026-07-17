@@ -30,6 +30,10 @@ multi-user concerns.
 - A CLI (`dmox tree`, `dmox context`) that lets terminal coding agents
   (Codex, Claude Code, etc.) consume the same doc tree/content a human sees
   in the web UI, via the same REST API
+- A static export (`dmox build`) that produces a self-contained static site
+  deployable to GitHub Pages or any static host — browse, render, client-side
+  full-text search, and Git history/blame, all frozen at build time (no
+  semantic search, no live updates; see §3 and §4)
 
 ### Explicitly out of scope (v0)
 - In-app editing, commits, or PRs from DMOX
@@ -88,6 +92,40 @@ provider, rendering options). No database server and no Node runtime required
 at run time — Node is only needed to build the frontend bundle that gets
 embedded into the binary.
 
+**Two run modes, one SPA.** The Vite/React SPA's data-fetching layer talks to
+a "data source" that is either the live Gin API (`dmox serve`) or a directory
+of pre-generated static JSON files with the identical response shape
+(`dmox build`). The SPA components never know which one they're talking to.
+This avoids building a second rendering pipeline for static export — `dmox
+build` runs the same core services once, dumps their outputs as static JSON
+next to the SPA's static assets, and both modes render through the same
+React components.
+
+```
+dmox build --workspace X --out ./dist [--base-path /repo-name/]
+   │
+   ├─ runs Source Adapters, Indexer, Git Service, Render Pipeline once
+   │  (no server started, no live watching)
+   │
+   └─ writes:
+        dist/
+          index.html, assets/...        (SPA build, static-mode data source)
+          data/tree.json
+          data/files/<path>.json        (content + frontmatter + metadata)
+          data/search-index.json        (client-side FTS, e.g. Pagefind-style)
+          data/git-history.json         (log + blame, frozen at build time)
+          data/ai-context.json
+          <every-doc-route>/index.html  (SPA shell duplicated per route, so
+                                          deep links work without a server-
+                                          side rewrite rule)
+```
+
+Duplicating the SPA shell (`index.html`) into every doc route's folder is a
+standard static-SPA-hosting trick: it lets GitHub Pages (or any static host)
+serve a working page directly on a deep link/refresh, without needing a
+custom 404 rewrite. The SPA's client-side router then takes over for
+in-app navigation.
+
 ## 3. Core Components
 
 | Component | Responsibility |
@@ -99,6 +137,7 @@ embedded into the binary.
 | **Git Service** | Read-only: log/history per file, blame — wraps `go-git` against the local mirror |
 | **Render Pipeline** | Markdown parsed to structured data (headings, frontmatter) for the client; Mermaid fenced blocks passed through as-is for client-side rendering; PlantUML fenced blocks sent to a local renderer process, with results cached alongside the source doc |
 | **Gin API layer** | REST endpoints consumed by both the SPA and the CLI — the single interface every client (web, CLI, future MCP) goes through |
+| **Static Site Builder** | `dmox build` entry point: runs Source Adapters, Indexer, Git Service, and Render Pipeline once (no server, no live watching), then serializes their outputs to the static JSON shapes above and copies the SPA build (configured for the static data source) into the output directory |
 
 Each core component is an interface-first Go package (`source`, `index`,
 `search`, `gitsvc`, `render`), independently testable, with the
@@ -139,6 +178,14 @@ into any individual component.
    content to stdout, meant for piping into a terminal coding agent. Both
    require `dmox serve` to be running — the CLI is a client, not a
    standalone offline tool.
+9. **Static build** — `dmox build --workspace X --out DIR [--base-path P]`
+   does a one-shot sync of every source in the workspace (same code path as
+   startup sync, no watcher, no server), runs indexing and Git history/blame
+   collection once, renders PlantUML diagrams to cached images, then writes
+   the static JSON data files and the per-route SPA shells described in §2.
+   The command exits when the build finishes; there's no long-running
+   process and no `~/.dmox` state is required to already exist (a fresh
+   temp/mirror clone is used if needed).
 
 ## 5. Error Handling
 
@@ -156,6 +203,11 @@ into any individual component.
   indexed with raw content; parse warnings are logged.
 - **Invalid config on startup**: fail fast with a clear error message rather
   than starting with a broken/partial config.
+- **`dmox build` on a source with sync/render errors**: the build fails fast
+  with a non-zero exit and a clear message (unlike `dmox serve`'s
+  degrade-gracefully behavior) — a static export with silently missing pages
+  is worse than a failed CI build, since there's no live UI to show an error
+  badge on.
 
 ## 6. Testing Strategy
 
@@ -169,6 +221,12 @@ into any individual component.
   Playwright smoke test covering the browse → search happy path.
 - **CLI**: tests that invoke `dmox tree`/`dmox context` against a test
   server and assert on stdout format (text and JSON).
+- **Static build**: an integration test runs `dmox build` against a fixture
+  workspace, then asserts on the output directory — required files exist,
+  `data/*.json` matches the live API's response schema for the same
+  fixture, and a headless-browser smoke test loads a deep-linked doc route
+  directly from the built output (no server) to confirm the per-route shell
+  works.
 
 ## 7. Deferred / Future Sub-Projects
 
