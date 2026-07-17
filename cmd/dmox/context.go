@@ -28,7 +28,11 @@ func runContextCmd(args []string) {
 		}
 		collectLeaves(root, &targets)
 	default:
-		var entries []struct{ SourceID, Path, Title string }
+		var entries []struct {
+			SourceID string `json:"source_id"`
+			Path     string `json:"path"`
+			Title    string `json:"title"`
+		}
 		if err := apiGet("/api/workspaces/"+*workspace+"/ai-context", &entries); err != nil {
 			log.Fatal(err)
 		}
