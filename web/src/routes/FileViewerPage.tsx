@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
 import { MarkdownView } from '../components/MarkdownView';
 import { GitHistoryPanel } from '../components/GitHistoryPanel';
+import { flattenLeaves } from '../components/TreeView';
+import type { WorkspaceOutletContext } from './WorkspaceLayout';
 import type { FileView } from '../datasource/types';
 
 export function FileViewerPage() {
   const { workspaceId = '', '*': wildcardPath = '' } = useParams();
+  // Optional: FileViewerPage is also rendered directly (outside WorkspaceLayout's
+  // Outlet) in some tests, where no context is provided — prev/next simply disable.
+  const outletContext = useOutletContext<WorkspaceOutletContext | undefined>();
   const ds = useDataSource();
   const [file, setFile] = useState<FileView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +29,16 @@ export function FileViewerPage() {
     };
   }, [ds, workspaceId, wildcardPath]);
 
+  const { prevPath, nextPath } = useMemo(() => {
+    if (!outletContext?.tree) return { prevPath: undefined, nextPath: undefined };
+    const leaves = flattenLeaves(outletContext.tree);
+    const index = leaves.findIndex((l) => l.path === wildcardPath);
+    return {
+      prevPath: index > 0 ? leaves[index - 1].path : undefined,
+      nextPath: index >= 0 && index < leaves.length - 1 ? leaves[index + 1].path : undefined,
+    };
+  }, [outletContext, wildcardPath]);
+
   if (error) return <div className="error">Failed to load file: {error}</div>;
   if (!file) return <div className="loading">Loading…</div>;
 
@@ -33,6 +48,22 @@ export function FileViewerPage() {
       <h1>{file.title}</h1>
       <MarkdownView body={file.body} />
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
+      <nav className="doc-pager">
+        {prevPath ? (
+          <Link className="doc-pager-link doc-pager-prev" to={`/w/${workspaceId}/doc/${prevPath}`}>
+            ← Back
+          </Link>
+        ) : (
+          <span className="doc-pager-link doc-pager-disabled">← Back</span>
+        )}
+        {nextPath ? (
+          <Link className="doc-pager-link doc-pager-next" to={`/w/${workspaceId}/doc/${nextPath}`}>
+            Next →
+          </Link>
+        ) : (
+          <span className="doc-pager-link doc-pager-disabled">Next →</span>
+        )}
+      </nav>
     </article>
   );
 }

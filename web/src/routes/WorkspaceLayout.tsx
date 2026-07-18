@@ -4,6 +4,10 @@ import { useDataSource } from '../datasource/context';
 import { TreeView } from '../components/TreeView';
 import type { TreeNode } from '../datasource/types';
 
+export interface WorkspaceOutletContext {
+  tree: TreeNode;
+}
+
 export function WorkspaceLayout() {
   const { workspaceId = '' } = useParams();
   const ds = useDataSource();
@@ -42,7 +46,7 @@ export function WorkspaceLayout() {
           <TreeView node={tree} workspaceId={workspaceId} currentPath={currentPath} />
         </nav>
         <main className="content">
-          <Outlet />
+          <Outlet context={{ tree } satisfies WorkspaceOutletContext} />
         </main>
       </div>
     </div>

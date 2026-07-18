@@ -64,29 +64,68 @@ body {
 .tree ul {
   list-style: none;
   margin: 0;
-  padding-left: 0.75rem;
+  padding: 0;
 }
 
-.tree {
-  padding-left: 0;
+.tree ul {
+  padding-left: 1.1rem;
+  border-left: 1px solid #8883;
+  margin-left: 0.55rem;
 }
 
-.tree-dir {
+.tree li {
+  margin: 0.05rem 0;
+}
+
+.tree-dir,
+.tree-file {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
   background: none;
   border: none;
   cursor: pointer;
-  font: inherit;
-  padding: 0.15rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tree-file {
-  display: block;
-  padding: 0.15rem 0;
-  text-decoration: none;
+.tree-dir:hover,
+.tree-file:hover {
+  background: #8882;
+}
+
+.tree-chevron {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 0.8em;
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+.tree-icon {
+  flex-shrink: 0;
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.tree-dir {
+  font-weight: 600;
 }
 
 .tree-file.active {
-  font-weight: 700;
+  background: #6366f126;
+  color: #6366f1;
+  font-weight: 600;
 }
 
 .ai-context-badge {
@@ -113,6 +152,34 @@ body {
   color: #8888;
   padding-right: 1rem;
   white-space: nowrap;
+}
+
+.doc-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #8884;
+}
+
+.doc-pager-link {
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid #8884;
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+a.doc-pager-link:hover {
+  background: #8882;
+  border-color: #8888;
+}
+
+.doc-pager-disabled {
+  color: #8888;
+  cursor: default;
 }
 
 .terminal-view {
