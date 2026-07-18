@@ -121,16 +121,11 @@ body,
 }
 
 .doc-breadcrumb {
-  position: sticky;
-  top: -1.5rem;
-  margin: -1.5rem -2rem 1rem;
-  padding: 0.55rem 2rem;
-  background: Canvas;
-  color: CanvasText;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.55rem;
   border-bottom: 1px solid #8884;
   font-size: 0.8rem;
-  opacity: 0.75;
-  z-index: 2;
+  color: #8888;
   white-space: nowrap;
   overflow-x: auto;
 }
