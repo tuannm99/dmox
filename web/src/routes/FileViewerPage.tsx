@@ -50,29 +50,34 @@ export function FileViewerPage() {
   if (error) return <div className="error">Failed to load file: {error}</div>;
   if (!file) return <div className="loading">Loading…</div>;
 
+  const pagerLinks = (
+    <>
+      {prevPath ? (
+        <Link className="doc-pager-link doc-pager-prev" to={`/w/${workspaceId}/doc/${prevPath}`}>
+          ← Back
+        </Link>
+      ) : (
+        <span className="doc-pager-link doc-pager-disabled">← Back</span>
+      )}
+      {nextPath ? (
+        <Link className="doc-pager-link doc-pager-next" to={`/w/${workspaceId}/doc/${nextPath}`}>
+          Next →
+        </Link>
+      ) : (
+        <span className="doc-pager-link doc-pager-disabled">Next →</span>
+      )}
+    </>
+  );
+
   return (
     <article>
       <div className="doc-breadcrumb">{wildcardPath.split('/').join(' / ')}</div>
+      <nav className="doc-pager doc-pager-top">{pagerLinks}</nav>
       {file.is_ai_context && <div className="ai-context-badge">AI Context File</div>}
       <h1>{file.title}</h1>
       <MarkdownView body={file.body} />
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
-      <nav className="doc-pager">
-        {prevPath ? (
-          <Link className="doc-pager-link doc-pager-prev" to={`/w/${workspaceId}/doc/${prevPath}`}>
-            ← Back
-          </Link>
-        ) : (
-          <span className="doc-pager-link doc-pager-disabled">← Back</span>
-        )}
-        {nextPath ? (
-          <Link className="doc-pager-link doc-pager-next" to={`/w/${workspaceId}/doc/${nextPath}`}>
-            Next →
-          </Link>
-        ) : (
-          <span className="doc-pager-link doc-pager-disabled">Next →</span>
-        )}
-      </nav>
+      <nav className="doc-pager doc-pager-bottom">{pagerLinks}</nav>
     </article>
   );
 }
