@@ -7,6 +7,7 @@ import type { TreeNode } from '../datasource/types';
 export interface WorkspaceOutletContext {
   tree: TreeNode;
   scrollToTop: () => void;
+  resetScroll: () => void;
 }
 
 const SIDEBAR_WIDTH_KEY = 'dmox-sidebar-width';
@@ -79,13 +80,20 @@ export function WorkspaceLayout() {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
-  // Scroll the content pane back to the top on every navigation (doc pager,
-  // tree clicks, search/AI-context results) — .content is its own scroll
-  // container now, so the browser's default scroll-to-top-on-navigate
-  // behavior (which only applies to window scroll) doesn't reach it.
-  useEffect(() => {
+  const resetScroll = useCallback(() => {
     contentRef.current?.scrollTo({ top: 0 });
-  }, [location.pathname]);
+  }, []);
+
+  // Scroll the content pane back to the top on every navigation (search,
+  // ai-context, terminal) — .content is its own scroll container now, so the
+  // browser's default scroll-to-top-on-navigate behavior (which only applies
+  // to window scroll) doesn't reach it. FileViewerPage handles its own reset
+  // once its file data has actually loaded (see resetScroll usage there) —
+  // resetting here immediately on path change races with its Loading-state
+  // content swap and can get undone by the browser's scroll-anchoring.
+  useEffect(() => {
+    resetScroll();
+  }, [location.pathname, resetScroll]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -124,7 +132,7 @@ export function WorkspaceLayout() {
           onMouseDown={handleResizeMouseDown}
         />
         <main className="content" ref={contentRef}>
-          <Outlet context={{ tree, scrollToTop } satisfies WorkspaceOutletContext} />
+          <Outlet context={{ tree, scrollToTop, resetScroll } satisfies WorkspaceOutletContext} />
         </main>
         {showScrollTop && (
           <button type="button" className="scroll-to-top" onClick={scrollToTop}>

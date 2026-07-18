@@ -29,6 +29,14 @@ export function FileViewerPage() {
     };
   }, [ds, workspaceId, wildcardPath]);
 
+  // Reset scroll only once the new file has actually rendered — resetting at
+  // click time races with the Loading-state content swap and gets fought by
+  // the browser's scroll-anchoring, leaving the page stuck mid-scroll.
+  useEffect(() => {
+    if (file) outletContext?.resetScroll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
+
   const { prevPath, nextPath } = useMemo(() => {
     if (!outletContext?.tree) return { prevPath: undefined, nextPath: undefined };
     const leaves = flattenLeaves(outletContext.tree);
@@ -51,22 +59,14 @@ export function FileViewerPage() {
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
       <nav className="doc-pager">
         {prevPath ? (
-          <Link
-            className="doc-pager-link doc-pager-prev"
-            to={`/w/${workspaceId}/doc/${prevPath}`}
-            onClick={() => outletContext?.scrollToTop()}
-          >
+          <Link className="doc-pager-link doc-pager-prev" to={`/w/${workspaceId}/doc/${prevPath}`}>
             ← Back
           </Link>
         ) : (
           <span className="doc-pager-link doc-pager-disabled">← Back</span>
         )}
         {nextPath ? (
-          <Link
-            className="doc-pager-link doc-pager-next"
-            to={`/w/${workspaceId}/doc/${nextPath}`}
-            onClick={() => outletContext?.scrollToTop()}
-          >
+          <Link className="doc-pager-link doc-pager-next" to={`/w/${workspaceId}/doc/${nextPath}`}>
             Next →
           </Link>
         ) : (

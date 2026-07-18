@@ -52,8 +52,9 @@ describe('FileViewerPage', () => {
     };
 
     const scrollToTop = vi.fn();
+    const resetScroll = vi.fn();
     function ParentWithContext() {
-      return <Outlet context={{ tree, scrollToTop }} />;
+      return <Outlet context={{ tree, scrollToTop, resetScroll }} />;
     }
 
     render(
@@ -69,12 +70,12 @@ describe('FileViewerPage', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'B' })).toBeInTheDocument());
     expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/w/ws/doc/local/a.md');
     expect(screen.getByRole('link', { name: /next/i })).toHaveAttribute('href', '/w/ws/doc/local/c.md');
+    expect(resetScroll).toHaveBeenCalledTimes(1); // fires once on initial file load too
 
     fireEvent.click(screen.getByRole('link', { name: /next/i }));
-    expect(scrollToTop).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'B' })).toBeInTheDocument());
-
-    fireEvent.click(screen.getByRole('link', { name: /back/i }));
-    expect(scrollToTop).toHaveBeenCalledTimes(2);
+    // resetScroll fires again only once the new (navigated-to) file has rendered,
+    // not at click time — that's what makes it immune to the Loading-state race.
+    expect(resetScroll).toHaveBeenCalledTimes(2);
   });
 });
