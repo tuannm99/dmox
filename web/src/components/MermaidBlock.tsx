@@ -3,6 +3,28 @@ import mermaid from 'mermaid';
 
 let initialized = false;
 
+// Tracks whether the page was actively being wheel-scrolled just before the
+// cursor entered a diagram, so we can tell "scrolling past it" apart from
+// "stopped to zoom it" — see handleMouseEnter below.
+let lastPageWheelAt = 0;
+let wheelTrackingAttached = false;
+const SCROLL_PASSTHROUGH_WINDOW_MS = 200;
+
+function ensureWheelTracking() {
+  if (wheelTrackingAttached || typeof window === 'undefined') return;
+  wheelTrackingAttached = true;
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      // Ignore wheel events on diagrams themselves (zoom or pass-through) —
+      // only genuine page scrolling elsewhere should count as "recent scroll".
+      if (e.target instanceof Element && e.target.closest('.mermaid-diagram-wrapper')) return;
+      lastPageWheelAt = Date.now();
+    },
+    { passive: true, capture: true }
+  );
+}
+
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 4;
 
@@ -12,6 +34,14 @@ export function MermaidBlock({ source }: { source: string }) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+  // Set once per hover session (on mouse enter) and held until the cursor
+  // leaves: true means "cursor arrived mid-scroll, let wheel keep scrolling
+  // the page"; false means "cursor arrived at rest, wheel should zoom".
+  const passThroughRef = useRef(false);
+
+  useEffect(() => {
+    ensureWheelTracking();
+  }, []);
 
   useEffect(() => {
     if (!initialized) {
@@ -27,7 +57,16 @@ export function MermaidBlock({ source }: { source: string }) {
       .catch((e: unknown) => setError(String(e)));
   }, [source]);
 
+  const handleMouseEnter = useCallback(() => {
+    passThroughRef.current = Date.now() - lastPageWheelAt < SCROLL_PASSTHROUGH_WINDOW_MS;
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    passThroughRef.current = false;
+  }, []);
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (passThroughRef.current) return; // let the page keep scrolling through
     e.preventDefault();
     setScale((s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s - e.deltaY * 0.0015)));
   }, []);
@@ -65,6 +104,8 @@ export function MermaidBlock({ source }: { source: string }) {
     <div
       className="mermaid-diagram-wrapper"
       onWheel={handleWheel}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
