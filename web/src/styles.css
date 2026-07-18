@@ -92,6 +92,25 @@ body,
   background: #6366f180;
 }
 
+.scroll-to-top {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 5;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #8884;
+  background: Canvas;
+  color: CanvasText;
+  cursor: pointer;
+  font-size: 0.85rem;
+  box-shadow: 0 2px 8px #0004;
+}
+
+.scroll-to-top:hover {
+  background: #8882;
+}
+
 .content {
   flex: 1;
   height: 100%;

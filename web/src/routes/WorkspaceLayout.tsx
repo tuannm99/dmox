@@ -25,7 +25,9 @@ export function WorkspaceLayout() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
   const [dragging, setDragging] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const contentRef = useRef<HTMLElement>(null);
   const location = useLocation();
   const docPrefix = `/w/${workspaceId}/doc/`;
   const currentPath = location.pathname.startsWith(docPrefix) ? location.pathname.slice(docPrefix.length) : undefined;
@@ -76,6 +78,28 @@ export function WorkspaceLayout() {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
+  // Scroll the content pane back to the top on every navigation (doc pager,
+  // tree clicks, search/AI-context results) — .content is its own scroll
+  // container now, so the browser's default scroll-to-top-on-navigate
+  // behavior (which only applies to window scroll) doesn't reach it.
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    function onScroll() {
+      setShowScrollTop(el!.scrollTop > 300);
+    }
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [tree]);
+
+  const scrollToTop = useCallback(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   if (error) return <div className="error">Failed to load workspace: {error}</div>;
   if (!tree) return <div className="loading">Loading…</div>;
 
@@ -98,9 +122,14 @@ export function WorkspaceLayout() {
           aria-label="Resize sidebar"
           onMouseDown={handleResizeMouseDown}
         />
-        <main className="content">
+        <main className="content" ref={contentRef}>
           <Outlet context={{ tree } satisfies WorkspaceOutletContext} />
         </main>
+        {showScrollTop && (
+          <button type="button" className="scroll-to-top" onClick={scrollToTop}>
+            ↑ Top
+          </button>
+        )}
       </div>
     </div>
   );

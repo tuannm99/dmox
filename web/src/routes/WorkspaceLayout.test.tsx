@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { WorkspaceLayout } from './WorkspaceLayout';
 import { DataSourceProvider } from '../datasource/context';
+
+// jsdom doesn't implement Element.scrollTo — polyfill it so it can be spied on.
+if (!HTMLElement.prototype.scrollTo) {
+  HTMLElement.prototype.scrollTo = () => {};
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -83,5 +88,48 @@ describe('WorkspaceLayout', () => {
     const handle = await screen.findByRole('separator', { name: 'Resize sidebar' });
     const sidebar = handle.previousSibling as HTMLElement;
     expect(sidebar.style.width).toBe('420px');
+  });
+
+  it('scrolls the content pane back to top when navigating to a new route', async () => {
+    const scrollToSpy = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    (globalThis as any).__testDataSource = ds;
+    render(
+      <MemoryRouter initialEntries={['/w/ws']}>
+        <Routes>
+          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            <Route index element={<Link to="/w/ws/search">go to search</Link>} />
+            <Route path="search" element={<div>search page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    await screen.findByRole('link', { name: 'go to search' });
+    scrollToSpy.mockClear(); // ignore the scroll-to-top call from the initial mount
+
+    fireEvent.click(screen.getByRole('link', { name: 'go to search' }));
+    await screen.findByText('search page');
+
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
+    scrollToSpy.mockRestore();
+  });
+
+  it('shows a scroll-to-top button once scrolled past the threshold, and scrolls smoothly on click', async () => {
+    const scrollToSpy = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    renderWithDataSource(ds);
+    await screen.findByText('welcome');
+
+    expect(screen.queryByRole('button', { name: /top/i })).not.toBeInTheDocument();
+
+    const content = document.querySelector('.content') as HTMLElement;
+    Object.defineProperty(content, 'scrollTop', { value: 400, configurable: true });
+    fireEvent.scroll(content);
+
+    const topButton = await screen.findByRole('button', { name: /top/i });
+    fireEvent.click(topButton);
+
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    scrollToSpy.mockRestore();
   });
 });
