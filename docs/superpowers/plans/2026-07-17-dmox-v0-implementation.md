@@ -6783,7 +6783,7 @@ build-frontend:
 build: build-frontend
 	CGO_ENABLED=1 go build -tags sqlite_fts5 -o bin/dmox ./cmd/dmox
 
-test:
+test: build-frontend
 	CGO_ENABLED=1 go test -tags sqlite_fts5 ./...
 	cd web && npx vitest run
 
