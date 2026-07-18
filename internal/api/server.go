@@ -1,7 +1,9 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tuannm99/dmox/internal/app"
@@ -34,4 +36,22 @@ func corsMiddleware() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func MountFrontend(r *gin.Engine, assets fs.FS) {
+	fileServer := http.FileServer(http.FS(assets))
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		reqPath := strings.TrimPrefix(c.Request.URL.Path, "/")
+		if reqPath == "" {
+			reqPath = "index.html"
+		}
+		if _, err := fs.Stat(assets, reqPath); err != nil {
+			c.Request.URL.Path = "/" // SPA fallback: unknown client-side routes serve the shell
+		}
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	})
 }
