@@ -3,14 +3,31 @@
   font-family: system-ui, sans-serif;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
+  overflow: hidden;
+}
+
+.workspace-picker {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2rem;
+  list-style: none;
+}
+
+.workspace-picker li {
+  margin: 0.4rem 0;
 }
 
 .workspace-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
 }
 
 .topnav {
