@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +40,16 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
+// basePathPlaceholder is the literal token the frontend build bakes into every
+// asset URL (see web/vite.config.ts's `base` and internal/staticbuild's
+// substitution for `dmox build`). `dmox serve` always serves at the root path,
+// so it substitutes the token for "/" itself rather than requiring a build step.
+const basePathPlaceholder = "/__DMOX_BASE__/"
+
+// textAssetExt lists extensions that may contain the base-path placeholder and
+// therefore need substitution rather than being served byte-for-byte.
+var textAssetExt = map[string]bool{".html": true, ".js": true, ".css": true, ".json": true, ".map": true}
+
 func MountFrontend(r *gin.Engine, assets fs.FS) {
 	fileServer := http.FileServer(http.FS(assets))
 	r.NoRoute(func(c *gin.Context) {
@@ -50,8 +62,34 @@ func MountFrontend(r *gin.Engine, assets fs.FS) {
 			reqPath = "index.html"
 		}
 		if _, err := fs.Stat(assets, reqPath); err != nil {
-			c.Request.URL.Path = "/" // SPA fallback: unknown client-side routes serve the shell
+			reqPath = "index.html" // SPA fallback: unknown client-side routes serve the shell
 		}
+		if textAssetExt[filepath.Ext(reqPath)] {
+			data, err := fs.ReadFile(assets, reqPath)
+			if err == nil {
+				data = bytes.ReplaceAll(data, []byte(basePathPlaceholder), []byte("/"))
+				c.Data(http.StatusOK, mimeType(reqPath), data)
+				return
+			}
+		}
+		c.Request.URL.Path = "/" + reqPath
 		fileServer.ServeHTTP(c.Writer, c.Request)
 	})
+}
+
+func mimeType(path string) string {
+	switch filepath.Ext(path) {
+	case ".html":
+		return "text/html; charset=utf-8"
+	case ".js":
+		return "text/javascript; charset=utf-8"
+	case ".css":
+		return "text/css; charset=utf-8"
+	case ".json":
+		return "application/json"
+	case ".map":
+		return "application/json"
+	default:
+		return "application/octet-stream"
+	}
 }
