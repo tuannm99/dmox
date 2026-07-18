@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation, useParams } from 'react-router-dom';
+import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
 import { TreeView } from '../components/TreeView';
 import type { TreeNode } from '../datasource/types';
@@ -30,13 +30,21 @@ export function WorkspaceLayout() {
   if (!tree) return <div className="loading">Loading…</div>;
 
   return (
-    <div className="workspace-layout">
-      <nav className="sidebar">
-        <TreeView node={tree} workspaceId={workspaceId} currentPath={currentPath} />
+    <div className="workspace-shell">
+      <nav className="topnav">
+        <Link to={`/w/${workspaceId}`}>{tree.name}</Link>
+        <Link to={`/w/${workspaceId}/search`}>Search</Link>
+        <Link to={`/w/${workspaceId}/ai-context`}>AI Context</Link>
+        <Link to={`/w/${workspaceId}/terminal`}>Terminal</Link>
       </nav>
-      <main className="content">
-        <Outlet />
-      </main>
+      <div className="workspace-layout">
+        <nav className="sidebar">
+          <TreeView node={tree} workspaceId={workspaceId} currentPath={currentPath} />
+        </nav>
+        <main className="content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

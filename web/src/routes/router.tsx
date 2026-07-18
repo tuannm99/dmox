@@ -4,6 +4,7 @@ import { WorkspaceLayout } from './WorkspaceLayout';
 import { FileViewerPage } from './FileViewerPage';
 import { SearchPage } from './SearchPage';
 import { AIContextPage } from './AIContextPage';
+import { TerminalPage } from './TerminalPage';
 
 export const router = createBrowserRouter([
   { path: '/', element: <WorkspacePickerPage /> },
@@ -14,6 +15,7 @@ export const router = createBrowserRouter([
       { path: 'doc/*', element: <FileViewerPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'ai-context', element: <AIContextPage /> },
+      { path: 'terminal', element: <TerminalPage /> },
     ],
   },
 ]);

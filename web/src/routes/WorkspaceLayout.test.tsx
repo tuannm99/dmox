@@ -35,4 +35,12 @@ describe('WorkspaceLayout', () => {
     renderWithDataSource(ds);
     await waitFor(() => expect(screen.getByText(/failed to load workspace/i)).toBeInTheDocument());
   });
+
+  it('renders nav links to search, ai-context, and terminal', async () => {
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    renderWithDataSource(ds);
+    expect(await screen.findByRole('link', { name: 'Search' })).toHaveAttribute('href', '/w/ws/search');
+    expect(screen.getByRole('link', { name: 'AI Context' })).toHaveAttribute('href', '/w/ws/ai-context');
+    expect(screen.getByRole('link', { name: 'Terminal' })).toHaveAttribute('href', '/w/ws/terminal');
+  });
 });

@@ -24,6 +24,7 @@ func NewRouter(a *app.App) *gin.Engine {
 	g.GET("/workspaces/:id/git/history", handleGitHistory(a))
 	g.GET("/workspaces/:id/git/blame", handleGitBlame(a))
 	g.POST("/sources/:id/pull", handleSourcePull(a))
+	g.GET("/workspaces/:id/terminal/ws", handleTerminalWS(a))
 	return r
 }
 

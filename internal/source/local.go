@@ -24,6 +24,7 @@ func NewLocalSource(id, root string) *LocalSource {
 
 func (s *LocalSource) ID() string        { return s.id }
 func (s *LocalSource) SupportsGit() bool { return false }
+func (s *LocalSource) Root() string      { return s.root }
 
 func (s *LocalSource) Sync(ctx context.Context) error {
 	info, err := os.Stat(s.root)
