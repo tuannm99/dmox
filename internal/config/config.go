@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -83,6 +85,7 @@ func (c *Config) applyDefaults() {
 			c.DataDir = ".dmox"
 		}
 	}
+	c.DataDir = expandHome(c.DataDir)
 	for wi := range c.Workspaces {
 		for si := range c.Workspaces[wi].Sources {
 			s := &c.Workspaces[wi].Sources[si]
@@ -91,6 +94,26 @@ func (c *Config) applyDefaults() {
 			}
 		}
 	}
+}
+
+// expandHome expands a leading "~" or "~/" in path to the user's home
+// directory. Paths that don't start with "~" are returned unchanged.
+func expandHome(path string) string {
+	if path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
 
 func (c *Config) validate() error {

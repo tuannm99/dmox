@@ -64,12 +64,12 @@ func TestParse_MalformedFrontmatterLogsWarningAndFallsBackToRawContent(t *testin
 
 func TestIsAIContextFile(t *testing.T) {
 	cases := map[string]bool{
-		"CLAUDE.md":              true,
-		"AGENTS.md":              true,
-		".cursorrules":           true,
-		".cursor/rules/foo.mdc":  true,
-		"guide.md":               false,
-		"nested/CLAUDE.md":       true,
+		"CLAUDE.md":             true,
+		"AGENTS.md":             true,
+		".cursorrules":          true,
+		".cursor/rules/foo.mdc": true,
+		"guide.md":              false,
+		"nested/CLAUDE.md":      true,
 	}
 	for path, want := range cases {
 		if got := IsAIContextFile(path); got != want {

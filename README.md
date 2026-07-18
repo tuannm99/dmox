@@ -12,7 +12,10 @@ Backend + frontend against the live API (two terminals):
     CGO_ENABLED=1 go build -tags sqlite_fts5 -o bin/dmox ./cmd/dmox
     ./bin/dmox serve          # serves the REST API on :8080 against ./example/docs
 
-    cd web && npm install && npm run dev   # Vite dev server on :5173, talks to :8080
+    cd web && npm install && npm run dev   # Vite dev server, talks to :8080
+
+Open http://localhost:5173/__DMOX_BASE__/ (not the bare root — the base-path
+placeholder used for static-export subpath hosting applies in dev mode too).
 
 Full binary with the embedded frontend:
 

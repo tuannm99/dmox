@@ -48,12 +48,12 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	a := &App{
-		Cfg:      cfg,
-		Store:    st,
-		Indexer:  index.New(st),
-		Search:   search.New(st),
-		Git:      gitsvc.New(),
-		PlantUML: render.NewPlantUMLRenderer(cfg.Render.PlantUML.JarPath, filepath.Join(cfg.DataDir, "plantuml-cache")),
+		Cfg:        cfg,
+		Store:      st,
+		Indexer:    index.New(st),
+		Search:     search.New(st),
+		Git:        gitsvc.New(),
+		PlantUML:   render.NewPlantUMLRenderer(cfg.Render.PlantUML.JarPath, filepath.Join(cfg.DataDir, "plantuml-cache")),
 		Workspaces: map[string]*Workspace{},
 	}
 

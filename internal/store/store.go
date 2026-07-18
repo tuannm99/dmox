@@ -67,5 +67,5 @@ func (s *Store) migrate() error {
 	return nil
 }
 
-func (s *Store) DB() *sql.DB { return s.db }
+func (s *Store) DB() *sql.DB  { return s.db }
 func (s *Store) Close() error { return s.db.Close() }

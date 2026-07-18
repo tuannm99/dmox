@@ -3,6 +3,7 @@ package doctree
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/tuannm99/dmox/internal/source"
@@ -54,6 +55,7 @@ func Build(ctx context.Context, rootName string, sourceIDs []string, sources map
 		src := sources[sid]
 		files, err := src.List(ctx)
 		if err != nil {
+			log.Printf("doctree: source %q failed to list, dropping from tree: %v", sid, err)
 			continue
 		}
 		mount := TreeNode{Name: sid, Path: sid, IsDir: true}

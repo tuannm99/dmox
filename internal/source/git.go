@@ -27,9 +27,9 @@ func NewGitSource(id, url, branch, dataDir string) *GitSource {
 	return &GitSource{id: id, url: url, branch: branch, mirrorDir: filepath.Join(dataDir, "mirrors", id)}
 }
 
-func (s *GitSource) ID() string          { return s.id }
-func (s *GitSource) SupportsGit() bool   { return true }
-func (s *GitSource) MirrorDir() string   { return s.mirrorDir }
+func (s *GitSource) ID() string        { return s.id }
+func (s *GitSource) SupportsGit() bool { return true }
+func (s *GitSource) MirrorDir() string { return s.mirrorDir }
 
 func (s *GitSource) Sync(ctx context.Context) error {
 	if _, err := os.Stat(filepath.Join(s.mirrorDir, ".git")); errors.Is(err, os.ErrNotExist) {

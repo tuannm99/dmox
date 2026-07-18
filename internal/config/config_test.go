@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -113,5 +114,83 @@ workspaces:
 func TestLoad_FileNotFound(t *testing.T) {
 	if _, err := Load("/nonexistent/config.yaml"); err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoad_ExpandsTildeDataDir(t *testing.T) {
+	path := writeTemp(t, `
+data_dir: ~/.dmox
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: local-docs
+        type: local
+        path: ./docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if strings.Contains(cfg.DataDir, "~") {
+		t.Fatalf("expected data_dir to not contain '~', got %q", cfg.DataDir)
+	}
+	if !filepath.IsAbs(cfg.DataDir) {
+		t.Fatalf("expected data_dir to be absolute, got %q", cfg.DataDir)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("os.UserHomeDir: %v", err)
+	}
+	want := filepath.Join(home, ".dmox")
+	if cfg.DataDir != want {
+		t.Fatalf("expected data_dir %q, got %q", want, cfg.DataDir)
+	}
+}
+
+func TestLoad_ExpandsBareTildeDataDir(t *testing.T) {
+	path := writeTemp(t, `
+data_dir: "~"
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: local-docs
+        type: local
+        path: ./docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if strings.Contains(cfg.DataDir, "~") {
+		t.Fatalf("expected data_dir to not contain '~', got %q", cfg.DataDir)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("os.UserHomeDir: %v", err)
+	}
+	if cfg.DataDir != home {
+		t.Fatalf("expected data_dir %q, got %q", home, cfg.DataDir)
+	}
+}
+
+func TestLoad_AbsoluteDataDirUnchanged(t *testing.T) {
+	path := writeTemp(t, `
+data_dir: /var/lib/dmox
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: local-docs
+        type: local
+        path: ./docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.DataDir != "/var/lib/dmox" {
+		t.Fatalf("expected data_dir unchanged %q, got %q", "/var/lib/dmox", cfg.DataDir)
 	}
 }

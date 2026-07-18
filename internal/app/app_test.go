@@ -15,8 +15,8 @@ func TestApp_New_WiresWorkspacesAndSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := &config.Config{
-		DataDir: t.TempDir(),
-		Server:  config.ServerConfig{Addr: ":0"},
+		DataDir:    t.TempDir(),
+		Server:     config.ServerConfig{Addr: ":0"},
 		Embeddings: config.EmbeddingsConfig{Provider: "none"},
 		Workspaces: []config.Workspace{
 			{ID: "ws", Name: "WS", Sources: []config.Source{
@@ -48,8 +48,8 @@ func TestApp_SyncAndIndexAll_IndexesFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := &config.Config{
-		DataDir: t.TempDir(),
-		Server:  config.ServerConfig{Addr: ":0"},
+		DataDir:    t.TempDir(),
+		Server:     config.ServerConfig{Addr: ":0"},
 		Embeddings: config.EmbeddingsConfig{Provider: "none"},
 		Workspaces: []config.Workspace{
 			{ID: "ws", Name: "WS", Sources: []config.Source{
@@ -92,8 +92,8 @@ func TestApp_New_RejectsUnknownSourceType(t *testing.T) {
 func TestApp_SyncAndIndexAll_FailFastAbortsOnFirstError(t *testing.T) {
 	nonexistentPath := "/nonexistent/path/that/does/not/exist"
 	cfg := &config.Config{
-		DataDir: t.TempDir(),
-		Server:  config.ServerConfig{Addr: ":0"},
+		DataDir:    t.TempDir(),
+		Server:     config.ServerConfig{Addr: ":0"},
 		Embeddings: config.EmbeddingsConfig{Provider: "none"},
 		Workspaces: []config.Workspace{
 			{ID: "ws", Name: "WS", Sources: []config.Source{
@@ -124,8 +124,8 @@ func TestApp_SyncAndIndexAll_DegradesGracefullyWhenNotFailFast(t *testing.T) {
 	nonexistentPath := "/nonexistent/path/that/does/not/exist"
 
 	cfg := &config.Config{
-		DataDir: t.TempDir(),
-		Server:  config.ServerConfig{Addr: ":0"},
+		DataDir:    t.TempDir(),
+		Server:     config.ServerConfig{Addr: ":0"},
 		Embeddings: config.EmbeddingsConfig{Provider: "none"},
 		Workspaces: []config.Workspace{
 			{ID: "ws", Name: "WS", Sources: []config.Source{
