@@ -44,6 +44,7 @@ export function FileViewerPage() {
 
   return (
     <article>
+      <div className="doc-breadcrumb">{wildcardPath.split('/').join(' / ')}</div>
       {file.is_ai_context && <div className="ai-context-badge">AI Context File</div>}
       <h1>{file.title}</h1>
       <MarkdownView body={file.body} />

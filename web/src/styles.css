@@ -115,8 +115,24 @@ body,
   flex: 1;
   height: 100%;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 1.5rem 2rem;
   min-width: 0;
+}
+
+.doc-breadcrumb {
+  position: sticky;
+  top: -1.5rem;
+  margin: -1.5rem -2rem 1rem;
+  padding: 0.55rem 2rem;
+  background: Canvas;
+  color: CanvasText;
+  border-bottom: 1px solid #8884;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  z-index: 2;
+  white-space: nowrap;
+  overflow-x: auto;
 }
 
 .tree,
