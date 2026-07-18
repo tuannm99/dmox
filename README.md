@@ -27,6 +27,18 @@ Static export:
     make build
     ./bin/dmox build --workspace example --out ./dist --base-path /
 
+## In-browser terminal
+
+Each workspace has a `Terminal` tab (top nav) that opens a real shell rooted
+at the workspace's local source directory, streamed over a WebSocket
+(`GET /api/workspaces/:id/terminal/ws`). It runs whatever command you type —
+including `claude` — with no authentication layer.
+
+This is safe only because `dmox serve` is meant to run on localhost for a
+single user. Do not put this server on a LAN, behind a tunnel, or behind a
+reverse proxy without adding authentication in front of it first, or anyone
+who can reach the port can run commands on your machine.
+
 ## Tests
 
     make test
