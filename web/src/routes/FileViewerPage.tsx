@@ -50,14 +50,22 @@ export function FileViewerPage() {
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
       <nav className="doc-pager">
         {prevPath ? (
-          <Link className="doc-pager-link doc-pager-prev" to={`/w/${workspaceId}/doc/${prevPath}`}>
+          <Link
+            className="doc-pager-link doc-pager-prev"
+            to={`/w/${workspaceId}/doc/${prevPath}`}
+            onClick={() => outletContext?.scrollToTop()}
+          >
             ← Back
           </Link>
         ) : (
           <span className="doc-pager-link doc-pager-disabled">← Back</span>
         )}
         {nextPath ? (
-          <Link className="doc-pager-link doc-pager-next" to={`/w/${workspaceId}/doc/${nextPath}`}>
+          <Link
+            className="doc-pager-link doc-pager-next"
+            to={`/w/${workspaceId}/doc/${nextPath}`}
+            onClick={() => outletContext?.scrollToTop()}
+          >
             Next →
           </Link>
         ) : (

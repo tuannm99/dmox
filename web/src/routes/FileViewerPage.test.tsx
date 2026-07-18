@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { FileViewerPage } from './FileViewerPage';
 import type { TreeNode } from '../datasource/types';
@@ -51,8 +51,9 @@ describe('FileViewerPage', () => {
       ],
     };
 
+    const scrollToTop = vi.fn();
     function ParentWithContext() {
-      return <Outlet context={{ tree }} />;
+      return <Outlet context={{ tree, scrollToTop }} />;
     }
 
     render(
@@ -68,5 +69,12 @@ describe('FileViewerPage', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'B' })).toBeInTheDocument());
     expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/w/ws/doc/local/a.md');
     expect(screen.getByRole('link', { name: /next/i })).toHaveAttribute('href', '/w/ws/doc/local/c.md');
+
+    fireEvent.click(screen.getByRole('link', { name: /next/i }));
+    expect(scrollToTop).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'B' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('link', { name: /back/i }));
+    expect(scrollToTop).toHaveBeenCalledTimes(2);
   });
 });

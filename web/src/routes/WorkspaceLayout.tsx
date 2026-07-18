@@ -6,6 +6,7 @@ import type { TreeNode } from '../datasource/types';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
+  scrollToTop: () => void;
 }
 
 const SIDEBAR_WIDTH_KEY = 'dmox-sidebar-width';
@@ -123,7 +124,7 @@ export function WorkspaceLayout() {
           onMouseDown={handleResizeMouseDown}
         />
         <main className="content" ref={contentRef}>
-          <Outlet context={{ tree } satisfies WorkspaceOutletContext} />
+          <Outlet context={{ tree, scrollToTop } satisfies WorkspaceOutletContext} />
         </main>
         {showScrollTop && (
           <button type="button" className="scroll-to-top" onClick={scrollToTop}>
