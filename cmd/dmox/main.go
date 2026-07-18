@@ -52,7 +52,3 @@ Usage:
   dmox tree --workspace ID [--format text|json]
   dmox context --workspace ID [--filter ai|all]`)
 }
-
-func runBuildCmd(args []string) {
-	log.Fatal("build command not yet implemented")
-}
