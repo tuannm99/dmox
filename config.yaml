@@ -1,0 +1,10 @@
+workspaces:
+  - id: example
+    name: "Example Docs"
+    sources:
+      - id: local
+        type: local
+        path: ./example/docs
+data_dir: ~/.dmox
+server:
+  addr: ":8080"

@@ -3,3 +3,7 @@ node_modules/
 *.tsbuildinfo
 internal/webassets/dist/*
 !internal/webassets/dist/index.html
+/bin/
+/dist/
+web/dist/
+.dmox/
