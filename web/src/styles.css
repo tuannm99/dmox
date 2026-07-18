@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.workspace-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid #8884;
+  padding: 1rem;
+}
+
+.content {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  min-width: 0;
+}
+
+.tree,
+.tree ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0.75rem;
+}
+
+.tree {
+  padding-left: 0;
+}
+
+.tree-dir {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.15rem 0;
+}
+
+.tree-file {
+  display: block;
+  padding: 0.15rem 0;
+  text-decoration: none;
+}
+
+.tree-file.active {
+  font-weight: 700;
+}
+
+.ai-context-badge {
+  display: inline-block;
+  background: #6366f1;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.error {
+  color: #dc2626;
+}
+
+.blame-table {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+}
+
+.blame-meta {
+  color: #8888;
+  padding-right: 1rem;
+  white-space: nowrap;
+}
