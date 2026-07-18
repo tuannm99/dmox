@@ -7,14 +7,46 @@ body {
   margin: 0;
 }
 
+.workspace-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topnav {
+  flex-shrink: 0;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #8884;
+}
+
+.topnav a {
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.topnav a:first-child {
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.topnav a:hover {
+  text-decoration: underline;
+}
+
 .workspace-layout {
   display: flex;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar {
   width: 260px;
   flex-shrink: 0;
+  height: 100%;
   overflow-y: auto;
   border-right: 1px solid #8884;
   padding: 1rem;
@@ -22,6 +54,8 @@ body {
 
 .content {
   flex: 1;
+  height: 100%;
+  overflow-y: auto;
   padding: 1.5rem 2rem;
   min-width: 0;
 }
@@ -79,4 +113,44 @@ body {
   color: #8888;
   padding-right: 1rem;
   white-space: nowrap;
+}
+
+.terminal-view {
+  height: 100%;
+  width: 100%;
+  background: #1e1e1e;
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.content table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+  font-size: 0.9rem;
+}
+
+.content th,
+.content td {
+  border: 1px solid #8884;
+  padding: 0.5rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.content th {
+  background: #8881;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.content tbody tr:nth-child(even) {
+  background: #8880;
+}
+
+.content tbody tr:nth-child(odd) {
+  background: #8881;
 }
