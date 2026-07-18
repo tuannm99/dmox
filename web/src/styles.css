@@ -44,12 +44,35 @@ body {
 }
 
 .sidebar {
-  width: 260px;
   flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
-  border-right: 1px solid #8884;
+  overflow-x: hidden;
   padding: 1rem;
+  box-sizing: border-box;
+}
+
+.sidebar-resizer {
+  flex-shrink: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: #8882;
+  touch-action: none;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: #6366f180;
+}
+
+.workspace-shell.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.workspace-shell.resizing .sidebar-resizer {
+  background: #6366f180;
 }
 
 .content {
@@ -180,6 +203,58 @@ a.doc-pager-link:hover {
 .doc-pager-disabled {
   color: #8888;
   cursor: default;
+}
+
+.mermaid-diagram-wrapper {
+  position: relative;
+  overflow: hidden;
+  margin: 1rem 0;
+  border: 1px solid #8884;
+  border-radius: 0.5rem;
+  background: #8880;
+  touch-action: none;
+}
+
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  transform-origin: center center;
+  transition: transform 60ms ease-out;
+  will-change: transform;
+}
+
+.mermaid-diagram-wrapper:hover .mermaid-diagram {
+  outline: 2px solid #6366f14d;
+  outline-offset: -2px;
+}
+
+.mermaid-reset-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid #8884;
+  background: Canvas;
+  color: CanvasText;
+  cursor: pointer;
+}
+
+.mermaid-reset-btn:hover {
+  background: #8882;
+}
+
+.mermaid-error {
+  color: #dc2626;
+  white-space: pre-wrap;
+}
+
+.content img {
+  max-width: 100%;
+  height: auto;
 }
 
 .terminal-view {
