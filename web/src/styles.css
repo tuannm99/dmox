@@ -151,6 +151,12 @@ body,
   overflow-y: auto;
 }
 
+.search-page,
+.ai-context-page {
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
 .scroll-to-top {
   position: fixed;
   bottom: 1.5rem;

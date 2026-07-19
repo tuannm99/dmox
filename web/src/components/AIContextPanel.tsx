@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
 import type { AIContextEntry } from '../datasource/types';
 
-export function AIContextPage() {
-  const { workspaceId = '' } = useParams();
+export function AIContextPanel({ workspaceId, onNavigate }: { workspaceId: string; onNavigate: () => void }) {
   const ds = useDataSource();
   const [entries, setEntries] = useState<AIContextEntry[]>([]);
   const [copied, setCopied] = useState(false);
@@ -29,7 +28,9 @@ export function AIContextPage() {
       <ul>
         {entries.map((e) => (
           <li key={`${e.source_id}/${e.path}`}>
-            <Link to={`/w/${workspaceId}/doc/${e.source_id}/${e.path}`}>{e.title}</Link>
+            <Link to={`/w/${workspaceId}/doc/${e.source_id}/${e.path}`} onClick={onNavigate}>
+              {e.title}
+            </Link>
           </li>
         ))}
       </ul>
