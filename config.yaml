@@ -1,10 +1,10 @@
 workspaces:
-  - id: example
-    name: "Example Docs"
+  - id: podzone
+    name: "PODZONE"
     sources:
       - id: local
         type: local
-        path: ./example/docs
+        path: ../podzone/docs/
 data_dir: ~/.dmox
 server:
   addr: ":8080"

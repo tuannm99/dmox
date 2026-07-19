@@ -23,7 +23,25 @@ services:
       - ${HOME}/.nvm/versions/node/v24.15.0:/opt/host-node:ro
       - ${HOME}/.local/share/claude/versions/2.1.215:/opt/host-claude/claude:ro
       - ${HOME}/.claude:/app/.claude
+      # Swap the base compose file's tracked example config for the repo's
+      # own config.yaml (tracked, but locally modified to point at a real
+      # workspace — never committed, see `git status`). Compose merges
+      # volumes by target path, so this replaces the base file's
+      # ./config.docker-example.yaml mount at the same /app/config.yaml
+      # target rather than adding a second, conflicting one.
+      - ./config.yaml:/app/config.yaml:ro
       # Account/session state claude keeps directly under $HOME (separate
       # from ~/.claude/), needed alongside .claude/.credentials.json for it
       # to recognize you as already logged in.
       - ${HOME}/.claude.json:/app/.claude.json
+      # /app itself is baked chown'd to uid 10001 (the image's default
+      # non-root user), not uid 1000, so `data_dir: ~/.dmox` (-> /app/.dmox
+      # with HOME pinned above) can't be created by this override's user.
+      # Bind-mounting a plain host dir here sidesteps that: it's naturally
+      # owned by uid 1000 since the host user creates it.
+      - ${HOME}/.dmox-docker-dev:/app/.dmox
+      # config.yaml's source path (../podzone/docs/) resolves relative to
+      # WORKDIR /app inside the container, i.e. /podzone/docs — mount the
+      # real sibling checkout there. Host-specific: adjust/remove if your
+      # workspace source lives somewhere else.
+      - ${HOME}/dev/local/podzone/docs:/podzone/docs:ro
