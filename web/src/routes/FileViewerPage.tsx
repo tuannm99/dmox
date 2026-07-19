@@ -71,7 +71,7 @@ export function FileViewerPage() {
       </nav>
       {file.is_ai_context && <div className="ai-context-badge">AI Context File</div>}
       <h1>{file.title}</h1>
-      <MarkdownView body={file.body} />
+      <MarkdownView body={file.body} workspaceId={workspaceId} currentPath={wildcardPath} />
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
     </article>
   );
