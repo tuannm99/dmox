@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 const PANEL_WIDTH_KEY = 'dmox-panel-width';
 const MIN_PANEL_WIDTH = 160;
-const MAX_PANEL_WIDTH = 600;
+// Unlike the left sidebar (a doc tree, fine to cap at 600px), this panel
+// also hosts the Terminal — users reasonably want it at half the screen or
+// more, so its ceiling is much more generous than the sidebar's.
+const MAX_PANEL_WIDTH = 1200;
 const DEFAULT_PANEL_WIDTH = 260;
 
 function readStoredPanelWidth(): number {
@@ -61,6 +64,16 @@ export function RightPanel({
   useEffect(() => {
     localStorage.setItem(PANEL_WIDTH_KEY, String(width));
   }, [width]);
+
+  // Exposes this panel's rendered footprint so viewport-fixed elements
+  // elsewhere (e.g. the scroll-to-top button) can offset around it without
+  // this component needing to know who they are.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--right-panel-width', open ? `${width}px` : '0px');
+    return () => {
+      document.documentElement.style.setProperty('--right-panel-width', '0px');
+    };
+  }, [open, width]);
 
   useEffect(() => {
     document.body.style.cursor = dragging ? 'col-resize' : '';

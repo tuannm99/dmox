@@ -4,6 +4,7 @@ import { RightPanel } from './RightPanel';
 
 beforeEach(() => {
   localStorage.clear();
+  document.documentElement.style.removeProperty('--right-panel-width');
 });
 
 describe('RightPanel', () => {
@@ -57,7 +58,7 @@ describe('RightPanel', () => {
     expect(localStorage.getItem('dmox-panel-width')).toBe('310');
   });
 
-  it('clamps width to the 160-600 bounds', () => {
+  it('clamps width to the min bound (160px)', () => {
     render(
       <RightPanel open title="Terminal" onClose={() => {}}>
         <div>panel content</div>
@@ -71,6 +72,38 @@ describe('RightPanel', () => {
     fireEvent.mouseUp(window, { clientX: 1000 });
 
     expect(panel.style.width).toBe('160px');
+  });
+
+  it('clamps width to the max bound (1200px) so a wide panel like Terminal can still grow well past a sidebar-sized cap', () => {
+    render(
+      <RightPanel open title="Terminal" onClose={() => {}}>
+        <div>panel content</div>
+      </RightPanel>
+    );
+    const handle = screen.getByRole('separator', { name: 'Resize panel' });
+    const panel = handle.parentElement as HTMLElement;
+
+    fireEvent.mouseDown(handle, { clientX: 1000 });
+    fireEvent.mouseMove(window, { clientX: -5000 }); // dragged left far past max
+    fireEvent.mouseUp(window, { clientX: -5000 });
+
+    expect(panel.style.width).toBe('1200px');
+  });
+
+  it('publishes its rendered width as --right-panel-width for other fixed-position UI to offset around, and clears it when closed', () => {
+    const { rerender } = render(
+      <RightPanel open title="Terminal" onClose={() => {}}>
+        <div>panel content</div>
+      </RightPanel>
+    );
+    expect(document.documentElement.style.getPropertyValue('--right-panel-width')).toBe('260px');
+
+    rerender(
+      <RightPanel open={false} title="Terminal" onClose={() => {}}>
+        <div>panel content</div>
+      </RightPanel>
+    );
+    expect(document.documentElement.style.getPropertyValue('--right-panel-width')).toBe('0px');
   });
 
   it('restores a previously persisted width on mount', () => {

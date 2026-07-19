@@ -193,7 +193,11 @@ body,
 .scroll-to-top {
   position: fixed;
   bottom: 1.5rem;
-  right: 1.5rem;
+  /* Offsets around the right panel (Terminal/Search/AI Context) when it's
+     open, via a CSS var RightPanel keeps in sync with its own width —
+     otherwise this viewport-fixed button sits underneath the panel instead
+     of at the edge of the doc content it belongs to. */
+  right: calc(1.5rem + var(--right-panel-width, 0px));
   z-index: 5;
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
