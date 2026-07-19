@@ -9,8 +9,52 @@ if (!HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = () => {};
 }
 
+class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+  static OPEN = 1;
+  onopen: (() => void) | null = null;
+  onmessage: ((ev: any) => void) | null = null;
+  onclose: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  readyState = 1;
+  binaryType = '';
+  constructor(public url: string) {
+    MockWebSocket.instances.push(this);
+  }
+  send() {}
+  close() {
+    this.readyState = 3;
+  }
+}
+
+vi.mock('@xterm/xterm', () => ({
+  Terminal: class {
+    rows = 24;
+    cols = 80;
+    open() {}
+    write() {}
+    dispose() {}
+    loadAddon() {}
+    onData() {
+      return { dispose: () => {} };
+    }
+    attachCustomKeyEventHandler() {}
+  },
+}));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit() {}
+  },
+}));
+
 beforeEach(() => {
   localStorage.clear();
+  MockWebSocket.instances = [];
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    disconnect() {}
+  });
 });
 
 vi.mock('../datasource/context', async () => {
@@ -45,12 +89,12 @@ describe('WorkspaceLayout', () => {
     await waitFor(() => expect(screen.getByText(/failed to load workspace/i)).toBeInTheDocument());
   });
 
-  it('renders nav links to search, ai-context, and terminal', async () => {
+  it('renders toggle buttons for search, ai-context, and terminal', async () => {
     const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
     renderWithDataSource(ds);
-    expect(await screen.findByRole('link', { name: 'Search' })).toHaveAttribute('href', '/w/ws/search');
-    expect(screen.getByRole('link', { name: 'AI Context' })).toHaveAttribute('href', '/w/ws/ai-context');
-    expect(screen.getByRole('link', { name: 'Terminal' })).toHaveAttribute('href', '/w/ws/terminal');
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI Context' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Terminal' })).toBeInTheDocument();
   });
 
   it('resizes the sidebar by dragging the resize handle, and persists the width', async () => {
@@ -131,5 +175,44 @@ describe('WorkspaceLayout', () => {
 
     expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     scrollToSpy.mockRestore();
+  });
+
+  it('toggles a panel open and closed when its topnav button is clicked', async () => {
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    renderWithDataSource(ds);
+    const searchButton = await screen.findByRole('button', { name: 'Search' });
+
+    fireEvent.click(searchButton);
+    expect(await screen.findByPlaceholderText(/search this workspace/i)).toBeInTheDocument();
+    expect(searchButton).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(searchButton);
+    expect(searchButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('keeps the terminal WebSocket alive when the panel is toggled closed and reopened', async () => {
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    renderWithDataSource(ds);
+    const terminalButton = await screen.findByRole('button', { name: 'Terminal' });
+
+    fireEvent.click(terminalButton); // open
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    fireEvent.click(terminalButton); // close
+    fireEvent.click(terminalButton); // reopen
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('toggles the terminal panel via the default keyboard shortcut', async () => {
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    renderWithDataSource(ds);
+    await screen.findByRole('button', { name: 'Terminal' });
+
+    fireEvent.keyDown(document, { key: '`', ctrlKey: true });
+    expect(await screen.findByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.keyDown(document, { key: '`', ctrlKey: true });
+    expect(screen.getByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-pressed', 'false');
   });
 });

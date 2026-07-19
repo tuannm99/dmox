@@ -54,6 +54,29 @@ body,
   text-decoration: underline;
 }
 
+.topnav button {
+  all: unset;
+  cursor: pointer;
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.topnav button:hover {
+  text-decoration: underline;
+}
+
+.topnav button[aria-pressed='true'] {
+  font-weight: 700;
+}
+
+/* Each panel pane needs an explicit height so TerminalPanel's
+   .terminal-view (height: 100%) resolves against something concrete —
+   a percentage height against an auto-height parent is otherwise ignored,
+   which would collapse the terminal to 0 rows. */
+.right-panel-pane {
+  height: 100%;
+}
+
 .workspace-layout {
   display: flex;
   flex: 1;
