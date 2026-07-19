@@ -13,8 +13,17 @@ services:
     # uid 10001 for this local-dev path only.
     user: '1000:1000'
     environment:
+      # Overriding `user:` to a raw uid with no /etc/passwd entry leaves
+      # $HOME unresolved (defaults to `/`), so claude/npm would look for
+      # config at /.claude, /.claude.json etc instead of where we actually
+      # mount them below. Pin it explicitly.
+      HOME: /app
       PATH: '/opt/host-node/bin:/opt/host-claude:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     volumes:
       - ${HOME}/.nvm/versions/node/v24.15.0:/opt/host-node:ro
       - ${HOME}/.local/share/claude/versions/2.1.215:/opt/host-claude/claude:ro
       - ${HOME}/.claude:/app/.claude
+      # Account/session state claude keeps directly under $HOME (separate
+      # from ~/.claude/), needed alongside .claude/.credentials.json for it
+      # to recognize you as already logged in.
+      - ${HOME}/.claude.json:/app/.claude.json
