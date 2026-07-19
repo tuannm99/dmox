@@ -19,7 +19,16 @@ export function TerminalPanel({ workspaceId, toggleBinding }: { workspaceId: str
 
     const term = new Terminal({
       cursorBlink: true,
-      fontFamily: 'ui-monospace, monospace',
+      // Shell prompts (starship, oh-my-posh, powerlevel10k, ...) commonly
+      // render icons/powerline glyphs that only exist in a "Nerd Font"
+      // patched typeface. Listing common ones lets the browser pick up
+      // whichever the user already has installed for their real terminal;
+      // falls back to plain monospace (glyphs show as tofu boxes) if none
+      // are present locally — there's no bundled font shipped for this.
+      fontFamily:
+        '"MesloLGS NF", "FiraCode Nerd Font", "JetBrainsMono Nerd Font", ' +
+        '"Hack Nerd Font", "CaskaydiaCove Nerd Font", "Symbols Nerd Font", ' +
+        'ui-monospace, monospace',
       fontSize: 13,
     });
     const fitAddon = new FitAddon();
