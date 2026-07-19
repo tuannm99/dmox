@@ -92,6 +92,65 @@ body,
   background: #6366f180;
 }
 
+.right-panel {
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  box-sizing: border-box;
+}
+
+.right-panel.closed {
+  display: none;
+}
+
+.right-panel-resizer {
+  flex-shrink: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: #8882;
+  touch-action: none;
+}
+
+.right-panel-resizer:hover,
+.right-panel-resizer:active {
+  background: #6366f180;
+}
+
+.right-panel-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #8884;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.right-panel-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+}
+
+.right-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .scroll-to-top {
   position: fixed;
   bottom: 1.5rem;
