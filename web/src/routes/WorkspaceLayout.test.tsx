@@ -215,4 +215,31 @@ describe('WorkspaceLayout', () => {
     fireEvent.keyDown(document, { key: '`', ctrlKey: true });
     expect(screen.getByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-pressed', 'false');
   });
+
+  it('closes and clears open panels when switching to a different workspace', async () => {
+    const ds = {
+      getTree: vi.fn((id: string) =>
+        Promise.resolve({ name: id === 'ws1' ? 'WS1' : 'WS2', path: '', is_dir: true, children: [] })
+      ),
+    };
+    (globalThis as any).__testDataSource = ds;
+    render(
+      <MemoryRouter initialEntries={['/w/ws1']}>
+        <Routes>
+          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            <Route index element={<Link to="/w/ws2">go to ws2</Link>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const terminalButton = await screen.findByRole('button', { name: 'Terminal' });
+    fireEvent.click(terminalButton);
+    expect(terminalButton).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'go to ws2' }));
+
+    await waitFor(() => expect(ds.getTree).toHaveBeenCalledWith('ws2'));
+    expect(await screen.findByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-pressed', 'false');
+  });
 });

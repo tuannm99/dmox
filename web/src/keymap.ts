@@ -10,7 +10,10 @@ export const defaultKeymap: Keymap = {
 export function matches(event: KeyboardEvent, binding: string): boolean {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform ?? '');
 
-  const parts = binding.toLowerCase().split('+');
+  const parts = binding
+    .toLowerCase()
+    .split('+')
+    .map((p) => p.trim());
   const key = parts[parts.length - 1];
   const wantShift = parts.includes('shift');
   const wantMod = parts.includes('mod');

@@ -33,6 +33,22 @@ describe('matches', () => {
     const event = new KeyboardEvent('keydown', { key: '`', metaKey: true });
     expect(matches(event, defaultKeymap.terminal)).toBe(true);
   });
+
+  it('tolerates whitespace around the + separators in a binding string', () => {
+    const event = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, shiftKey: true });
+    expect(matches(event, 'mod + shift + f')).toBe(true);
+  });
+
+  it('does not match when the other platform modifier is held instead of mod', () => {
+    // default (non-Mac) test environment: mod resolves to ctrlKey, so metaKey alone should not match
+    const event = new KeyboardEvent('keydown', { key: '`', metaKey: true, ctrlKey: false });
+    expect(matches(event, defaultKeymap.terminal)).toBe(false);
+  });
+
+  it('does not match when both modifiers are held at once', () => {
+    const event = new KeyboardEvent('keydown', { key: '`', ctrlKey: true, metaKey: true });
+    expect(matches(event, defaultKeymap.terminal)).toBe(false);
+  });
 });
 
 describe('mergeKeymap', () => {

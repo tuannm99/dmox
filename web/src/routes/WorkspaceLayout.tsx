@@ -59,6 +59,8 @@ export function WorkspaceLayout() {
     let cancelled = false;
     setTree(null);
     setError(null);
+    setActivePanel(null);
+    setOpenedPanels(new Set());
     ds.getTree(workspaceId).then(
       (t) => !cancelled && setTree(t),
       (e) => !cancelled && setError(String(e))
