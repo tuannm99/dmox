@@ -2,9 +2,16 @@ import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { matches } from '../keymap';
 
-export function TerminalView({ workspaceId }: { workspaceId: string }) {
+export function TerminalPanel({ workspaceId, toggleBinding }: { workspaceId: string; toggleBinding?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Read via ref, not a dependency: if the keymap override arrives (async
+  // fetch in WorkspaceLayout) after the terminal is already open, the effect
+  // below must NOT re-run — that would close this WebSocket and kill the
+  // shell, exactly the bug this component exists to fix.
+  const bindingRef = useRef(toggleBinding);
+  bindingRef.current = toggleBinding;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -19,6 +26,14 @@ export function TerminalView({ workspaceId }: { workspaceId: string }) {
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
+
+    term.attachCustomKeyEventHandler((event) => {
+      const binding = bindingRef.current;
+      // Returning false stops xterm from forwarding this keystroke to the
+      // shell (so it doesn't also type e.g. a stray backtick) when it's the
+      // configured toggle shortcut; everything else is forwarded normally.
+      return binding ? !matches(event, binding) : true;
+    });
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/workspaces/${workspaceId}/terminal/ws`);
