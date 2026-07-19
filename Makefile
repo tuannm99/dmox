@@ -1,4 +1,4 @@
-.PHONY: build-frontend build test run docker-build docker-up docker-up-dev docker-down
+.PHONY: build-frontend build test run docker-build docker-up docker-down
 
 build-frontend:
 	cd web && npm ci && npm run build
@@ -19,17 +19,13 @@ run: build
 docker-build:
 	docker build -t tuannm99/dmox:local .
 
-# Base compose only (docker-compose.yml) — the tracked example workspace,
-# portable, no host-specific mounts. Safe on any machine.
+# DEV-ONLY: Compose auto-merges docker-compose.override.yml on top of
+# docker-compose.yml here, which bind-mounts this host's node/npm/claude
+# binaries and ~/.claude config into the Terminal panel's shell. Only works
+# on a machine with those paths (see the override file's comments); never
+# use this target's image/config for anything beyond local dev.
 docker-up:
-	docker compose -f docker-compose.yml up --build
+	docker compose up --build
 
 docker-down:
 	docker compose down -v
-
-# DEV-ONLY: also merges docker-compose.override.yml, which bind-mounts this
-# host's node/npm/claude binaries and ~/.claude config into the Terminal
-# panel's shell. Only works on a machine with those paths (see the override
-# file's comments); never use this for anything beyond local dev.
-docker-up-dev:
-	docker compose up --build
