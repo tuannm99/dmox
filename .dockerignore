@@ -1,0 +1,15 @@
+.git
+.github
+.superpowers
+.claude
+docs/
+example/
+bin/
+dist/
+web/node_modules
+web/dist
+internal/webassets/dist/*
+!internal/webassets/dist/index.html
+.dmox/
+config.yaml
+*.md

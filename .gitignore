@@ -7,3 +7,4 @@ internal/webassets/dist/*
 /dist/
 web/dist/
 .dmox/
+dist
