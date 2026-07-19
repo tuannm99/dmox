@@ -168,14 +168,24 @@ body,
   color: inherit;
 }
 
+/* No overflow here on purpose: TerminalPanel's ResizeObserver refits xterm
+   to this container's size on every resize, and a scrolling ancestor whose
+   scrollbar appears/disappears as a side effect of that refit creates an
+   infinite resize loop (scrollbar steals width -> refit -> overflow clears
+   -> scrollbar goes away -> refit -> ...), which reads as constant
+   flickering and as the panel refusing to hold a wider dragged size.
+   Search/AI Context need list-scrolling instead, so it lives on their own
+   root elements below, not here. */
 .right-panel-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .search-page,
 .ai-context-page {
+  height: 100%;
+  overflow-y: auto;
   padding: 1rem;
   box-sizing: border-box;
 }
