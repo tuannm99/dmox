@@ -3,45 +3,18 @@ import mermaid from 'mermaid';
 
 let initialized = false;
 
-// Tracks whether the page was actively being wheel-scrolled just before the
-// cursor entered a diagram, so we can tell "scrolling past it" apart from
-// "stopped to zoom it" — see handleMouseEnter below.
-let lastPageWheelAt = 0;
-let wheelTrackingAttached = false;
-const SCROLL_PASSTHROUGH_WINDOW_MS = 200;
-
-function ensureWheelTracking() {
-  if (wheelTrackingAttached || typeof window === 'undefined') return;
-  wheelTrackingAttached = true;
-  window.addEventListener(
-    'wheel',
-    (e) => {
-      // Ignore wheel events on diagrams themselves (zoom or pass-through) —
-      // only genuine page scrolling elsewhere should count as "recent scroll".
-      if (e.target instanceof Element && e.target.closest('.mermaid-diagram-wrapper')) return;
-      lastPageWheelAt = Date.now();
-    },
-    { passive: true, capture: true }
-  );
-}
-
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 4;
+const ZOOM_STEP = 0.25;
 
 export function MermaidBlock({ source }: { source: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [showCode, setShowCode] = useState(false);
+  const [copied, setCopied] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
-  // Set once per hover session (on mouse enter) and held until the cursor
-  // leaves: true means "cursor arrived mid-scroll, let wheel keep scrolling
-  // the page"; false means "cursor arrived at rest, wheel should zoom".
-  const passThroughRef = useRef(false);
-
-  useEffect(() => {
-    ensureWheelTracking();
-  }, []);
 
   useEffect(() => {
     if (!initialized) {
@@ -56,20 +29,6 @@ export function MermaidBlock({ source }: { source: string }) {
       })
       .catch((e: unknown) => setError(String(e)));
   }, [source]);
-
-  const handleMouseEnter = useCallback(() => {
-    passThroughRef.current = Date.now() - lastPageWheelAt < SCROLL_PASSTHROUGH_WINDOW_MS;
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    passThroughRef.current = false;
-  }, []);
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (passThroughRef.current) return; // let the page keep scrolling through
-    e.preventDefault();
-    setScale((s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s - e.deltaY * 0.0015)));
-  }, []);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -89,38 +48,68 @@ export function MermaidBlock({ source }: { source: string }) {
     dragRef.current = null;
   }, []);
 
+  const zoomIn = useCallback(() => {
+    setScale((s) => Math.min(MAX_SCALE, s + ZOOM_STEP));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setScale((s) => Math.max(MIN_SCALE, s - ZOOM_STEP));
+  }, []);
+
   const resetZoom = useCallback(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
   }, []);
 
+  const copySource = useCallback(() => {
+    navigator.clipboard.writeText(source).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [source]);
+
   if (error) {
     return <pre className="mermaid-error">Mermaid render failed: {error}</pre>;
   }
 
-  const zoomed = scale !== 1 || pan.x !== 0 || pan.y !== 0;
-
   return (
     <div
       className="mermaid-diagram-wrapper"
-      onWheel={handleWheel}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {zoomed && (
-        <button type="button" className="mermaid-reset-btn" onClick={resetZoom}>
-          Reset zoom
+      <div className="mermaid-toolbar">
+        <button type="button" onClick={() => setShowCode((v) => !v)}>
+          {showCode ? 'View Diagram' : 'View Code'}
         </button>
-      )}
+        <button type="button" onClick={copySource}>
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+        {!showCode && (
+          <>
+            <button type="button" onClick={zoomOut} disabled={scale <= MIN_SCALE} aria-label="Zoom out">
+              −
+            </button>
+            <button type="button" onClick={resetZoom}>
+              {Math.round(scale * 100)}%
+            </button>
+            <button type="button" onClick={zoomIn} disabled={scale >= MAX_SCALE} aria-label="Zoom in">
+              +
+            </button>
+          </>
+        )}
+      </div>
+      <pre className="mermaid-source" hidden={!showCode}>
+        <code>{source}</code>
+      </pre>
       <div
         className="mermaid-diagram"
         data-testid="mermaid-svg"
+        hidden={showCode}
         ref={ref}
-        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, cursor: scale > 1 ? 'grab' : 'zoom-in' }}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, cursor: scale > 1 ? 'grab' : 'default' }}
       />
     </div>
   );
