@@ -1,0 +1,23 @@
+services:
+  dmox:
+    build: .
+    image: tuannm99/dmox:local
+    restart: unless-stopped
+    # 127.0.0.1 only, not 0.0.0.0 — the Terminal panel is an unauthenticated
+    # shell (see README's "In-browser terminal" section), so this must never
+    # be published on a LAN/tunnel/ingress without auth in front of it.
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      # config.docker-example.yaml (tracked) points at the tracked example/
+      # workspace and sets data_dir: /data, for a zero-setup smoke test. For
+      # real use, point this at your own config.yaml (workspace + sources)
+      # — keep data_dir: /data so it lands on the volume below, which is the
+      # one path the image pre-creates and chowns to the non-root user at
+      # build time (see Dockerfile) — see the README's "Docker" section.
+      - ./config.docker-example.yaml:/app/config.yaml:ro
+      - ./example/docs:/app/example/docs:ro
+      - dmox-data:/data
+
+volumes:
+  dmox-data:

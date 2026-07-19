@@ -1,0 +1,20 @@
+# Local-only dev convenience layer, auto-merged on top of docker-compose.yml
+# by `docker compose up` (no -f flag needed). NOT for the published image —
+# Dockerfile/docker-compose.yml stay self-contained and portable; this file
+# just bind-mounts *this host's* node/claude toolchain into the Terminal
+# panel's shell so `node`/`npm`/`claude` work there like they do outside
+# Docker, without baking them into the image (see README's Docker security
+# notes — same no-auth-Terminal caveat applies here, mounting doesn't reduce
+# it, it just avoids installing a duplicate copy at build time).
+services:
+  dmox:
+    # Match the host user so bind-mounted ~/.claude files (some 600,
+    # owner-only) stay readable/writable — overrides the image's dedicated
+    # uid 10001 for this local-dev path only.
+    user: '1000:1000'
+    environment:
+      PATH: '/opt/host-node/bin:/opt/host-claude:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    volumes:
+      - ${HOME}/.nvm/versions/node/v24.15.0:/opt/host-node:ro
+      - ${HOME}/.local/share/claude/versions/2.1.215:/opt/host-claude/claude:ro
+      - ${HOME}/.claude:/app/.claude

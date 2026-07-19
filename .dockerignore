@@ -12,4 +12,7 @@ internal/webassets/dist/*
 !internal/webassets/dist/index.html
 .dmox/
 config.yaml
+config.docker-example.yaml
+docker-compose.yml
+docker-compose.override.yml
 *.md
