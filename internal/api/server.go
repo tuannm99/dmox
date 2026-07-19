@@ -17,6 +17,7 @@ func NewRouter(a *app.App) *gin.Engine {
 	r.Use(gin.Recovery(), gin.Logger(), corsMiddleware())
 	g := r.Group("/api")
 	g.GET("/workspaces", handleListWorkspaces(a))
+	g.GET("/keymap", handleKeymap(a))
 	g.GET("/workspaces/:id/tree", handleTree(a))
 	g.GET("/workspaces/:id/file", handleFile(a))
 	g.GET("/workspaces/:id/search", handleSearch(a))

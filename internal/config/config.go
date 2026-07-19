@@ -15,6 +15,7 @@ type Config struct {
 	Render     RenderConfig     `yaml:"render"`
 	Server     ServerConfig     `yaml:"server"`
 	DataDir    string           `yaml:"data_dir"`
+	Keymap     map[string]string `yaml:"keymap"`
 }
 
 type Workspace struct {
