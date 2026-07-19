@@ -73,13 +73,7 @@ export function MermaidBlock({ source }: { source: string }) {
   }
 
   return (
-    <div
-      className="mermaid-diagram-wrapper"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-    >
+    <div className="mermaid-diagram-wrapper">
       <div className="mermaid-toolbar">
         <button type="button" onClick={() => setShowCode((v) => !v)}>
           {showCode ? 'View Diagram' : 'View Code'}
@@ -109,6 +103,10 @@ export function MermaidBlock({ source }: { source: string }) {
         data-testid="mermaid-svg"
         hidden={showCode}
         ref={ref}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, cursor: scale > 1 ? 'grab' : 'default' }}
       />
     </div>
