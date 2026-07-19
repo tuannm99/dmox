@@ -3,6 +3,18 @@
   font-family: system-ui, sans-serif;
 }
 
+/* Without this, `height: 100%` + `padding` on the same element (.content,
+   .sidebar) makes the browser add padding on top of that 100%, so the box's
+   real rendered height exceeds its flex-allotted space by exactly its own
+   padding — the excess isn't clipped by any visible ancestor and spills up
+   to the root's `overflow: hidden`, silently cutting off the last line of
+   content instead of scrolling to reveal it. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -219,6 +231,10 @@ body,
   overflow-y: auto;
   overflow-anchor: none;
   padding: 1.5rem 2rem;
+  /* .scroll-to-top floats at position: fixed, independent of this
+     container's own scroll/padding, so the last line of a short doc can end
+     up hidden underneath it unless extra bottom clearance is reserved here. */
+  padding-bottom: 4.5rem;
   min-width: 0;
 }
 
