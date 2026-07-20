@@ -8,3 +8,4 @@ internal/webassets/dist/*
 web/dist/
 .dmox/
 dist
+.worktrees/
