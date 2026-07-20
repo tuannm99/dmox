@@ -33,3 +33,20 @@ describe('createStaticDataSource', () => {
     expect(results).toEqual([]);
   });
 });
+
+describe('createStaticDataSource subscribeToChanges / getFileDiff', () => {
+  it('subscribeToChanges is a no-op that never calls onEvent/onResync', () => {
+    const ds = createStaticDataSource('/base/');
+    const onEvent = vi.fn();
+    const onResync = vi.fn();
+    const cleanup = ds.subscribeToChanges('ws', onEvent, onResync);
+    cleanup();
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onResync).not.toHaveBeenCalled();
+  });
+
+  it('getFileDiff always resolves unavailable', async () => {
+    const ds = createStaticDataSource('/base/');
+    await expect(ds.getFileDiff('ws', 'local', 'a.md')).resolves.toEqual({ available: false });
+  });
+});

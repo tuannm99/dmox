@@ -1,6 +1,6 @@
 import type {
   DataSource, TreeNode, FileView, SearchResult, AIContextEntry, Workspace,
-  GitHistoryResult, GitBlameResult,
+  GitHistoryResult, GitBlameResult, FileDiff,
 } from './types';
 
 async function getJSON<T>(url: string): Promise<T> {
@@ -36,5 +36,10 @@ export function createStaticDataSource(basePath: string = import.meta.env.BASE_U
       const all = await getJSON<Record<string, GitBlameResult>>(`${root}/data/git-history.json`);
       return all[`${path}#blame`] ?? { applicable: false, lines: [] };
     },
+    // A static export is a frozen snapshot: it never changes live, and has
+    // no server to stream events from, so this is a correct no-op rather
+    // than a stub.
+    subscribeToChanges: () => () => {},
+    getFileDiff: async (): Promise<FileDiff> => ({ available: false }),
   };
 }

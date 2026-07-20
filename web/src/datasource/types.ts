@@ -60,6 +60,18 @@ export interface GitBlameResult {
   lines: BlameLine[];
 }
 
+export interface ChangeEvent {
+  sourceId: string;
+  path: string;
+  op: 'create' | 'modify' | 'delete';
+}
+
+export interface FileDiff {
+  available: boolean;
+  old?: string;
+  new?: string;
+}
+
 export interface DataSource {
   listWorkspaces(): Promise<Workspace[]>;
   getTree(workspaceId: string): Promise<TreeNode>;
@@ -68,4 +80,6 @@ export interface DataSource {
   getAIContext(workspaceId: string): Promise<AIContextEntry[]>;
   getGitHistory(workspaceId: string, path: string): Promise<GitHistoryResult>;
   getGitBlame(workspaceId: string, path: string): Promise<GitBlameResult>;
+  subscribeToChanges(workspaceId: string, onEvent: (ev: ChangeEvent) => void, onResync: () => void): () => void;
+  getFileDiff(workspaceId: string, sourceId: string, path: string): Promise<FileDiff>;
 }
