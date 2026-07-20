@@ -534,3 +534,66 @@ a.doc-pager-link:hover {
   font-size: 1rem;
   line-height: 1;
 }
+
+.diff-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.diff-modal {
+  background: #1e1e1e;
+  color: #ddd;
+  width: min(800px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.diff-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #333;
+  font-family: monospace;
+}
+
+.diff-modal-header button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.diff-body {
+  overflow: auto;
+  padding: 8px 0;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.diff-line-added {
+  background: rgba(46, 160, 67, 0.2);
+  color: #7ee787;
+}
+
+.diff-line-removed {
+  background: rgba(248, 81, 73, 0.2);
+  color: #ffa198;
+}
+
+.diff-line-context {
+  color: #999;
+}
+
+.diff-unavailable {
+  padding: 12px;
+}
