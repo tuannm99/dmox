@@ -8,6 +8,7 @@ import (
 	"github.com/tuannm99/dmox/internal/api"
 	"github.com/tuannm99/dmox/internal/app"
 	"github.com/tuannm99/dmox/internal/config"
+	"github.com/tuannm99/dmox/internal/livesync"
 	"github.com/tuannm99/dmox/internal/source"
 )
 
@@ -50,8 +51,57 @@ func runServe(cfg *config.Config) error {
 
 func watchAndReindex(ctx context.Context, a *app.App, wsID string, src source.Source, events <-chan source.ChangeEvent) {
 	for ev := range events {
+		oldBody, hadOld, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path)
+		if err != nil {
+			log.Printf("watch %s/%s/%s: read previous content failed: %v", wsID, src.ID(), ev.Path, err)
+		}
+		// Reconstruct with title if available
+		if hadOld {
+			var title string
+			a.Store.DB().QueryRowContext(ctx,
+				`SELECT title FROM files WHERE workspace_id=? AND source_id=? AND path=?`,
+				wsID, src.ID(), ev.Path,
+			).Scan(&title)
+			if title != "" {
+				oldBody = title + "\n" + oldBody
+			}
+		}
+
 		if err := a.Indexer.IndexFile(ctx, wsID, src, ev.Path); err != nil {
 			log.Printf("reindex %s/%s/%s failed: %v", wsID, src.ID(), ev.Path, err)
+			continue
 		}
+
+		if ev.Op != source.ChangeOpDelete {
+			if newBody, ok, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path); err == nil && ok {
+				// Reconstruct with title if available
+				var title string
+				a.Store.DB().QueryRowContext(ctx,
+					`SELECT title FROM files WHERE workspace_id=? AND source_id=? AND path=?`,
+					wsID, src.ID(), ev.Path,
+				).Scan(&title)
+				if title != "" {
+					newBody = title + "\n" + newBody
+				}
+				base := ""
+				if hadOld {
+					base = oldBody
+				}
+				a.Diffs.Record(wsID, src.ID(), ev.Path, base, newBody)
+			}
+		}
+
+		a.Events.Publish(wsID, livesync.Event{SourceID: src.ID(), Path: ev.Path, Op: changeOpString(ev.Op)})
+	}
+}
+
+func changeOpString(op source.ChangeOp) string {
+	switch op {
+	case source.ChangeOpCreate:
+		return "create"
+	case source.ChangeOpDelete:
+		return "delete"
+	default:
+		return "modify"
 	}
 }
