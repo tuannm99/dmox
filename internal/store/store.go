@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -69,3 +70,19 @@ func (s *Store) migrate() error {
 
 func (s *Store) DB() *sql.DB  { return s.db }
 func (s *Store) Close() error { return s.db.Close() }
+
+// GetFileBody returns the currently indexed body for a file, or ok=false if
+// no such row exists (never indexed, or already removed).
+func (s *Store) GetFileBody(ctx context.Context, workspaceID, sourceID, path string) (body string, ok bool, err error) {
+	err = s.db.QueryRowContext(ctx,
+		`SELECT body FROM files WHERE workspace_id=? AND source_id=? AND path=?`,
+		workspaceID, sourceID, path,
+	).Scan(&body)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return body, true, nil
+}

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 )
@@ -44,4 +45,36 @@ func TestOpen_CreatesDataDir(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer s.Close()
+}
+
+func TestStore_GetFileBody_FoundAndNotFound(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "dmox.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	_, err = s.DB().ExecContext(ctx,
+		`INSERT INTO files (workspace_id, source_id, path, title, frontmatter, body, is_ai_context, mtime)
+		 VALUES ('ws', 'local', 'guide.md', 'Guide', '{}', 'hello world', 0, 0)`)
+	if err != nil {
+		t.Fatalf("seed insert: %v", err)
+	}
+
+	body, ok, err := s.GetFileBody(ctx, "ws", "local", "guide.md")
+	if err != nil {
+		t.Fatalf("GetFileBody: %v", err)
+	}
+	if !ok || body != "hello world" {
+		t.Fatalf("GetFileBody = (%q, %v), want (%q, true)", body, ok, "hello world")
+	}
+
+	_, ok, err = s.GetFileBody(ctx, "ws", "local", "nope.md")
+	if err != nil {
+		t.Fatalf("GetFileBody (missing): %v", err)
+	}
+	if ok {
+		t.Fatal("expected ok=false for a path that was never indexed")
+	}
 }
