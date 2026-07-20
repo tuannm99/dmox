@@ -155,3 +155,30 @@ func TestApp_SyncAndIndexAll_DegradesGracefullyWhenNotFailFast(t *testing.T) {
 		t.Fatalf("indexed row count for healthy source = %d, want 1", count)
 	}
 }
+
+func TestApp_New_WiresLivesyncHubAndDiffCache(t *testing.T) {
+	cfg := &config.Config{
+		DataDir:    t.TempDir(),
+		Server:     config.ServerConfig{Addr: ":0"},
+		Embeddings: config.EmbeddingsConfig{Provider: "none"},
+	}
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer a.Close()
+
+	if a.Events == nil {
+		t.Fatal("expected App.Events to be initialized")
+	}
+	if a.Diffs == nil {
+		t.Fatal("expected App.Diffs to be initialized")
+	}
+
+	// Roundtrip: Diffs should behave like a working DiffCache.
+	a.Diffs.Record("ws", "local", "x.md", "old", "new")
+	old, new_, available := a.Diffs.Consume("ws", "local", "x.md")
+	if !available || old != "old" || new_ != "new" {
+		t.Fatalf("Diffs roundtrip = (%q, %q, %v)", old, new_, available)
+	}
+}

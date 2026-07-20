@@ -11,6 +11,7 @@ import (
 	"github.com/tuannm99/dmox/internal/embedprovider"
 	"github.com/tuannm99/dmox/internal/gitsvc"
 	"github.com/tuannm99/dmox/internal/index"
+	"github.com/tuannm99/dmox/internal/livesync"
 	"github.com/tuannm99/dmox/internal/render"
 	"github.com/tuannm99/dmox/internal/search"
 	"github.com/tuannm99/dmox/internal/source"
@@ -37,6 +38,8 @@ type App struct {
 	Search     *search.Service
 	Git        *gitsvc.Service
 	PlantUML   *render.PlantUMLRenderer
+	Events     *livesync.Hub
+	Diffs      *livesync.DiffCache
 	Workspaces map[string]*Workspace
 }
 
@@ -54,6 +57,8 @@ func New(cfg *config.Config) (*App, error) {
 		Search:     search.New(st),
 		Git:        gitsvc.New(),
 		PlantUML:   render.NewPlantUMLRenderer(cfg.Render.PlantUML.JarPath, filepath.Join(cfg.DataDir, "plantuml-cache")),
+		Events:     livesync.NewHub(),
+		Diffs:      livesync.NewDiffCache(200),
 		Workspaces: map[string]*Workspace{},
 	}
 
