@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
 import { TreeView } from '../components/TreeView';
-import type { TreeNode } from '../datasource/types';
+import type { TreeNode, ChangeEvent } from '../datasource/types';
 import { RightPanel } from '../components/RightPanel';
 import { TerminalPanel } from '../components/TerminalPanel';
 import { SearchPanel } from '../components/SearchPanel';
 import { AIContextPanel } from '../components/AIContextPanel';
 import { defaultKeymap, mergeKeymap, matches, fetchKeymapOverrides, type PanelKind, type Keymap } from '../keymap';
+import { ToastStack, type ToastItem } from '../components/ToastStack';
+import { DiffModal } from '../components/DiffModal';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
   scrollToTop: () => void;
   resetScroll: () => void;
+  contentRef: React.RefObject<HTMLElement>;
+  fileChangeEvent: ChangeEvent | null;
 }
 
 const SIDEBAR_WIDTH_KEY = 'dmox-sidebar-width';
@@ -49,11 +53,21 @@ export function WorkspaceLayout() {
   const [activePanel, setActivePanel] = useState<PanelKind | null>(null);
   const [openedPanels, setOpenedPanels] = useState<Set<PanelKind>>(new Set());
   const [keymap, setKeymap] = useState<Keymap>(defaultKeymap);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string } | null>(null);
+  const [fileChangeEvent, setFileChangeEvent] = useState<ChangeEvent | null>(null);
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const contentRef = useRef<HTMLElement>(null);
+  const currentPathRef = useRef<string | undefined>(undefined);
+  const treeRefetchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastIdRef = useRef(0);
   const location = useLocation();
   const docPrefix = `/w/${workspaceId}/doc/`;
   const currentPath = location.pathname.startsWith(docPrefix) ? location.pathname.slice(docPrefix.length) : undefined;
+
+  useEffect(() => {
+    currentPathRef.current = currentPath;
+  }, [currentPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +83,48 @@ export function WorkspaceLayout() {
       cancelled = true;
     };
   }, [ds, workspaceId]);
+
+  // Long-lived subscription to live-change events for this workspace. Kept
+  // as its own effect (deps: [ds, workspaceId] only) so it doesn't tear down
+  // and reopen on unrelated state changes (sidebar drag, panel toggles,
+  // scroll) the way the tree-fetch effect above intentionally does.
+  useEffect(() => {
+    function scheduleTreeRefetch() {
+      clearTimeout(treeRefetchTimer.current);
+      treeRefetchTimer.current = setTimeout(() => {
+        ds.getTree(workspaceId).then(setTree, (e) => setError(String(e)));
+      }, 200);
+    }
+
+    function handleEvent(ev: ChangeEvent) {
+      scheduleTreeRefetch();
+      toastIdRef.current += 1;
+      setToasts((prev) => [...prev, { id: String(toastIdRef.current), sourceId: ev.sourceId, path: ev.path, op: ev.op }]);
+      if (currentPathRef.current === `${ev.sourceId}/${ev.path}`) {
+        setFileChangeEvent(ev);
+      }
+    }
+
+    function handleResync() {
+      ds.getTree(workspaceId).then(setTree, (e) => setError(String(e)));
+      const current = currentPathRef.current;
+      if (!current) return;
+      const slash = current.indexOf('/');
+      if (slash > 0) {
+        setFileChangeEvent({ sourceId: current.slice(0, slash), path: current.slice(slash + 1), op: 'modify' });
+      }
+    }
+
+    return ds.subscribeToChanges(workspaceId, handleEvent, handleResync);
+  }, [ds, workspaceId]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const viewDiff = useCallback((item: ToastItem) => {
+    setDiffTarget({ sourceId: item.sourceId, path: item.path });
+  }, []);
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -190,7 +246,7 @@ export function WorkspaceLayout() {
           onMouseDown={handleResizeMouseDown}
         />
         <main className="content" ref={contentRef}>
-          <Outlet context={{ tree, scrollToTop, resetScroll } satisfies WorkspaceOutletContext} />
+          <Outlet context={{ tree, scrollToTop, resetScroll, contentRef, fileChangeEvent } satisfies WorkspaceOutletContext} />
         </main>
         {openedPanels.size > 0 && (
           <RightPanel open={activePanel !== null} title={panelTitle(activePanel)} onClose={() => setActivePanel(null)}>
@@ -215,6 +271,15 @@ export function WorkspaceLayout() {
           <button type="button" className="scroll-to-top" onClick={scrollToTop}>
             ↑ Top
           </button>
+        )}
+        <ToastStack items={toasts} onDismiss={dismissToast} onViewDiff={viewDiff} />
+        {diffTarget && (
+          <DiffModal
+            workspaceId={workspaceId}
+            sourceId={diffTarget.sourceId}
+            path={diffTarget.path}
+            onClose={() => setDiffTarget(null)}
+          />
         )}
       </div>
     </div>

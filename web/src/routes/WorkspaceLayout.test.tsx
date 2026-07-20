@@ -59,7 +59,23 @@ beforeEach(() => {
 
 vi.mock('../datasource/context', async () => {
   const actual = await vi.importActual<typeof import('../datasource/context')>('../datasource/context');
-  return { ...actual, useDataSource: () => (globalThis as any).__testDataSource };
+  // Memoize the merged object per underlying test `ds`, keyed by its identity — WorkspaceLayout's
+  // effects depend on `ds` (e.g. the tree-fetch and change-subscription effects use `[ds, workspaceId]`),
+  // so returning a fresh object literal on every call would break referential stability and cause
+  // those effects to tear down and re-run on every render.
+  let cachedBase: unknown;
+  let cachedMerged: unknown;
+  return {
+    ...actual,
+    useDataSource: () => {
+      const base = (globalThis as any).__testDataSource;
+      if (base !== cachedBase) {
+        cachedBase = base;
+        cachedMerged = { subscribeToChanges: () => () => {}, ...base };
+      }
+      return cachedMerged;
+    },
+  };
 });
 
 function renderWithDataSource(ds: any, path = '/w/ws') {
@@ -241,5 +257,62 @@ describe('WorkspaceLayout', () => {
 
     await waitFor(() => expect(ds.getTree).toHaveBeenCalledWith('ws2'));
     expect(await screen.findByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('refetches the tree when a change event arrives', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let capturedOnEvent: ((ev: any) => void) | undefined;
+    const getTree = vi
+      .fn()
+      .mockResolvedValueOnce({ name: 'WS', path: '', is_dir: true, children: [] })
+      .mockResolvedValueOnce({ name: 'WS', path: '', is_dir: true, children: [{ name: 'new.md', path: 'local/new.md', is_dir: false }] });
+    const ds = {
+      getTree,
+      subscribeToChanges: (_id: string, onEvent: (ev: any) => void) => {
+        capturedOnEvent = onEvent;
+        return () => {};
+      },
+    };
+    renderWithDataSource(ds);
+    await screen.findByText('welcome');
+
+    capturedOnEvent?.({ sourceId: 'local', path: 'new.md', op: 'create' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    await waitFor(() => expect(getTree).toHaveBeenCalledTimes(2));
+    vi.useRealTimers();
+  });
+
+  it('shows a toast for a change event, with a working View diff / dismiss flow', async () => {
+    let capturedOnEvent: ((ev: any) => void) | undefined;
+    const ds = {
+      getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }),
+      subscribeToChanges: (_id: string, onEvent: (ev: any) => void) => {
+        capturedOnEvent = onEvent;
+        return () => {};
+      },
+      getFileDiff: vi.fn().mockResolvedValue({ available: false }),
+    };
+    renderWithDataSource(ds);
+    await screen.findByText('welcome');
+
+    capturedOnEvent?.({ sourceId: 'local', path: 'guide.md', op: 'modify' });
+    expect(await screen.findByText(/guide\.md/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /view diff/i }));
+    await waitFor(() => expect(ds.getFileDiff).toHaveBeenCalledWith('ws', 'local', 'guide.md'));
+    expect(await screen.findByText(/no previous version/i)).toBeInTheDocument();
+  });
+
+  it('calls the unsubscribe function returned by subscribeToChanges on unmount', async () => {
+    const unsubscribe = vi.fn();
+    const ds = {
+      getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }),
+      subscribeToChanges: vi.fn(() => unsubscribe),
+    };
+    const { unmount } = renderWithDataSource(ds);
+    await screen.findByText('welcome');
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
   });
 });
