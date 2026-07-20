@@ -55,17 +55,6 @@ func watchAndReindex(ctx context.Context, a *app.App, wsID string, src source.So
 		if err != nil {
 			log.Printf("watch %s/%s/%s: read previous content failed: %v", wsID, src.ID(), ev.Path, err)
 		}
-		// Reconstruct with title if available
-		if hadOld {
-			var title string
-			a.Store.DB().QueryRowContext(ctx,
-				`SELECT title FROM files WHERE workspace_id=? AND source_id=? AND path=?`,
-				wsID, src.ID(), ev.Path,
-			).Scan(&title)
-			if title != "" {
-				oldBody = title + "\n" + oldBody
-			}
-		}
 
 		if err := a.Indexer.IndexFile(ctx, wsID, src, ev.Path); err != nil {
 			log.Printf("reindex %s/%s/%s failed: %v", wsID, src.ID(), ev.Path, err)
@@ -74,15 +63,6 @@ func watchAndReindex(ctx context.Context, a *app.App, wsID string, src source.So
 
 		if ev.Op != source.ChangeOpDelete {
 			if newBody, ok, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path); err == nil && ok {
-				// Reconstruct with title if available
-				var title string
-				a.Store.DB().QueryRowContext(ctx,
-					`SELECT title FROM files WHERE workspace_id=? AND source_id=? AND path=?`,
-					wsID, src.ID(), ev.Path,
-				).Scan(&title)
-				if title != "" {
-					newBody = title + "\n" + newBody
-				}
 				base := ""
 				if hadOld {
 					base = oldBody

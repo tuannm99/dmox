@@ -94,7 +94,7 @@ func TestWatchAndReindex_PublishesEventAndRecordsDiff(t *testing.T) {
 	if !available {
 		t.Fatal("expected a diff entry to have been recorded")
 	}
-	if old != "Guide\nv1" || new_ != "Guide\nv2" {
+	if old != "v1" || new_ != "v2" {
 		t.Fatalf("diff = (old=%q, new=%q)", old, new_)
 	}
 }
