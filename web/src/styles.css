@@ -407,7 +407,10 @@ a.doc-pager-link:hover {
   border: 1px solid #8884;
   border-radius: 0.5rem;
   background: #8880;
-  touch-action: none;
+  /* touch-action is set inline on .mermaid-diagram, conditional on zoom
+     state — see MermaidBlock.tsx. Unconditionally disabling it here blocked
+     vertical page scroll (touch/trackpad gestures) whenever the pointer was
+     over a diagram taller than the viewport, even while not zoomed in. */
 }
 
 .mermaid-diagram {

@@ -107,7 +107,15 @@ export function MermaidBlock({ source }: { source: string }) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, cursor: scale > 1 ? 'grab' : 'default' }}
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          cursor: scale > 1 ? 'grab' : 'default',
+          // Only opt out of native touch/trackpad scrolling once actually
+          // zoomed in, when drag-to-pan should take over — at the default
+          // 100% there's nothing to pan, so the page must still scroll
+          // normally through a diagram taller than the viewport.
+          touchAction: scale > 1 ? 'none' : 'pan-y',
+        }}
       />
     </div>
   );

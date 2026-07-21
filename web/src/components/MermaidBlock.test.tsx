@@ -76,6 +76,23 @@ describe('MermaidBlock', () => {
     expect(diagram.style.transform).toBe('translate(0px, 0px) scale(1)');
   });
 
+  it('allows normal vertical page scroll through the diagram at 100% zoom (touch-action: pan-y)', async () => {
+    render(<MermaidBlock source={SOURCE} />);
+    const diagram = await screen.findByTestId('mermaid-svg');
+    expect(diagram.style.touchAction).toBe('pan-y');
+  });
+
+  it('takes over touch gestures for drag-to-pan once zoomed in (touch-action: none)', async () => {
+    render(<MermaidBlock source={SOURCE} />);
+    const diagram = await screen.findByTestId('mermaid-svg');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(diagram.style.touchAction).toBe('none');
+
+    fireEvent.click(screen.getByRole('button', { name: '125%' })); // reset
+    expect(diagram.style.touchAction).toBe('pan-y');
+  });
+
   it('toggles to a code view showing the raw source, hiding the zoom controls, and back', async () => {
     render(<MermaidBlock source={SOURCE} />);
     const diagram = await screen.findByTestId('mermaid-svg');
