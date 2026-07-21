@@ -272,6 +272,16 @@ body,
   margin-left: 0.55rem;
 }
 
+/* A favorited folder's children reuse <TreeView>, whose root <ul class="tree">
+   isn't a nested `.tree ul` (it's a fresh top-level tree), so it misses the
+   indent above by default — apply the same indent here since visually it's
+   nested under the favorite row. */
+.favorite-item > .tree {
+  padding-left: 1.1rem;
+  border-left: 1px solid #8883;
+  margin-left: 0.55rem;
+}
+
 .tree li {
   margin: 0.05rem 0;
 }
