@@ -188,4 +188,45 @@ describe('FileViewerPage', () => {
 
     await waitFor(() => expect(screen.getByText(/this file was deleted/i)).toBeInTheDocument());
   });
+
+  it('clears the deleted banner and shows new content when a create event follows a delete for the same path', async () => {
+    (globalThis as any).__testDataSource = {
+      getFile: vi
+        .fn()
+        .mockResolvedValueOnce({ path: 'local/b.md', title: 'B v1', frontmatter: {}, body: 'body v1', headings: [], is_ai_context: false })
+        .mockResolvedValueOnce({ path: 'local/b.md', title: 'B v2', frontmatter: {}, body: 'body v2', headings: [], is_ai_context: false }),
+    };
+
+    function ParentWithContext() {
+      const [fileChangeEvent, setFileChangeEvent] = useState<{ sourceId: string; path: string; op: 'delete' | 'create' } | null>(null);
+      const contentRef = useRef<HTMLElement>(null);
+      return (
+        <div>
+          <button onClick={() => setFileChangeEvent({ sourceId: 'local', path: 'b.md', op: 'delete' })}>simulate delete</button>
+          <button onClick={() => setFileChangeEvent({ sourceId: 'local', path: 'b.md', op: 'create' })}>simulate create</button>
+          <Outlet context={{ tree: undefined, scrollToTop: vi.fn(), resetScroll: vi.fn(), contentRef, fileChangeEvent }} />
+        </div>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/w/ws/doc/local/b.md']}>
+        <Routes>
+          <Route element={<ParentWithContext />}>
+            <Route path="/w/:workspaceId/doc/*" element={<FileViewerPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'B v1' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('simulate delete'));
+    await waitFor(() => expect(screen.getByText(/this file was deleted/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('simulate create'));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'B v2' })).toBeInTheDocument());
+    expect(screen.queryByText(/this file was deleted/i)).not.toBeInTheDocument();
+  });
 });

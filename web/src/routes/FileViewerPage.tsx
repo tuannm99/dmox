@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
 import { MarkdownView } from '../components/MarkdownView';
@@ -16,6 +16,11 @@ export function FileViewerPage() {
   const [file, setFile] = useState<FileView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleted, setDeleted] = useState(false);
+  // Set immediately before setFile() in the live-refetch (fileChangeEvent) path
+  // below, and only there, so the [file]-effect can tell "this update is a
+  // live in-place refresh of the same file" apart from "this update is a
+  // genuine navigation to a different file" — see that effect for why.
+  const suppressNextResetScrollRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,8 +38,22 @@ export function FileViewerPage() {
   // Reset scroll only once the new file has actually rendered — resetting at
   // click time races with the Loading-state content swap and gets fought by
   // the browser's scroll-anchoring, leaving the page stuck mid-scroll.
+  //
+  // This effect also fires for a live in-place refetch of the SAME file
+  // (fileChangeEvent below also calls setFile, producing a new `file`
+  // reference), where resetting to top would be wrong — we want to preserve
+  // scroll position there instead. The fileChangeEvent effect sets
+  // suppressNextResetScrollRef.current = true immediately before its setFile
+  // call; we consume (and clear) that flag here instead of calling
+  // resetScroll(), so the two effects cooperate deterministically regardless
+  // of effect-flush/rAF scheduling order.
   useEffect(() => {
-    if (file) outletContext?.resetScroll();
+    if (!file) return;
+    if (suppressNextResetScrollRef.current) {
+      suppressNextResetScrollRef.current = false;
+      return;
+    }
+    outletContext?.resetScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
@@ -46,10 +65,12 @@ export function FileViewerPage() {
 
   // React to a live-change event for the currently-open file (already
   // pre-filtered by WorkspaceLayout to match this file's path). A delete
-  // shows a persistent banner; a modify/create refetches in place and
-  // restores the scroll position afterwards via requestAnimationFrame, which
-  // runs after the [file]-effect above has already fired resetScroll for
-  // this same update, so our restore wins and is the final scroll position.
+  // shows a persistent banner; a modify/create refetches in place, clears any
+  // stale deleted-banner (a create can follow a delete for the same path
+  // while this page stays mounted), and restores the scroll position
+  // afterwards via requestAnimationFrame. suppressNextResetScrollRef is set
+  // right before setFile() so the [file]-effect above skips its resetScroll()
+  // for this update instead of racing it.
   useEffect(() => {
     const ev = outletContext?.fileChangeEvent;
     if (!ev) return;
@@ -60,6 +81,8 @@ export function FileViewerPage() {
     const scrollEl = outletContext?.contentRef?.current;
     const prevScrollTop = scrollEl?.scrollTop ?? 0;
     ds.getFile(workspaceId, wildcardPath).then((f) => {
+      setDeleted(false);
+      suppressNextResetScrollRef.current = true;
       setFile(f);
       if (scrollEl) {
         requestAnimationFrame(() => {
