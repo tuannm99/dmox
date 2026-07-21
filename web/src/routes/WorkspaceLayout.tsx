@@ -10,6 +10,8 @@ import { AIContextPanel } from '../components/AIContextPanel';
 import { defaultKeymap, mergeKeymap, matches, fetchKeymapOverrides, type PanelKind, type Keymap } from '../keymap';
 import { ToastStack, type ToastItem } from '../components/ToastStack';
 import { DiffModal } from '../components/DiffModal';
+import { FavoritesSection } from '../components/FavoritesSection';
+import { useFavorites } from '../useFavorites';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
@@ -56,6 +58,7 @@ export function WorkspaceLayout() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string } | null>(null);
   const [fileChangeEvent, setFileChangeEvent] = useState<ChangeEvent | null>(null);
+  const { favorites, toggleFavorite, isFavorite } = useFavorites(workspaceId);
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const contentRef = useRef<HTMLElement>(null);
   const currentPathRef = useRef<string | undefined>(undefined);
@@ -236,7 +239,21 @@ export function WorkspaceLayout() {
       </nav>
       <div className="workspace-layout">
         <nav className="sidebar" style={{ width: sidebarWidth }}>
-          <TreeView node={tree} workspaceId={workspaceId} currentPath={currentPath} />
+          <FavoritesSection
+            tree={tree}
+            workspaceId={workspaceId}
+            currentPath={currentPath}
+            favorites={favorites}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+          />
+          <TreeView
+            node={tree}
+            workspaceId={workspaceId}
+            currentPath={currentPath}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+          />
         </nav>
         <div
           className="sidebar-resizer"

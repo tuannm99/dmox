@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TreeView } from './TreeView';
+import { TreeView, findNodeByPath } from './TreeView';
 import type { TreeNode } from '../datasource/types';
 
 const tree: TreeNode = {
@@ -34,5 +34,57 @@ describe('TreeView', () => {
     expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /local/ }));
     expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+  });
+
+  it('renders no favorite toggle when onToggleFavorite is not provided', () => {
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button', { name: /favorites/i })).not.toBeInTheDocument();
+  });
+
+  it('renders a favorite toggle per row that reflects isFavorite and calls onToggleFavorite with the right entry', () => {
+    const onToggleFavorite = vi.fn();
+    const isFavorite = (path: string) => path === 'local/guide.md';
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove guide.md from favorites' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add local to favorites' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add local to favorites' }));
+    expect(onToggleFavorite).toHaveBeenCalledWith({ path: 'local', isDir: true, name: 'local' });
+  });
+
+  it('clicking a favorite toggle does not navigate or toggle the row it sits on', () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" isFavorite={() => false} onToggleFavorite={onToggleFavorite} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add local to favorites' }));
+    // the directory should still be expanded (favorite click didn't also collapse it)
+    expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
+  });
+});
+
+describe('findNodeByPath', () => {
+  it('finds a file node by exact path', () => {
+    expect(findNodeByPath(tree, 'local/guide.md')?.name).toBe('guide.md');
+  });
+
+  it('finds a directory node by exact path', () => {
+    expect(findNodeByPath(tree, 'local')?.name).toBe('local');
+  });
+
+  it('returns undefined for a path that no longer exists', () => {
+    expect(findNodeByPath(tree, 'local/missing.md')).toBeUndefined();
   });
 });

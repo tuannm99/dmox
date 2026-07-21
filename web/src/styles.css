@@ -265,12 +265,18 @@ body,
   margin: 0.05rem 0;
 }
 
+.tree-row {
+  display: flex;
+  align-items: center;
+}
+
 .tree-dir,
 .tree-file {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   padding: 0.3rem 0.5rem;
   border-radius: 0.4rem;
@@ -604,4 +610,115 @@ a.doc-pager-link:hover {
   background: rgba(248, 81, 73, 0.15);
   border: 1px solid rgba(248, 81, 73, 0.4);
   border-radius: 6px;
+}
+
+.tree-favorite-toggle {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85em;
+  line-height: 1;
+  opacity: 0.5;
+  color: #eab308;
+}
+
+.tree-favorite-toggle:hover {
+  opacity: 1;
+}
+
+.tree-favorite-toggle[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.favorites-section {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #8883;
+}
+
+.favorites-header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  padding: 0.3rem 0.5rem;
+}
+
+.favorites-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.favorite-item {
+  margin: 0.05rem 0;
+}
+
+.favorite-folder-toggle,
+.favorite-file {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.favorite-folder-toggle:hover,
+.favorite-file:hover {
+  background: #8882;
+}
+
+.favorite-file.active {
+  background: #6366f126;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+.favorite-icon {
+  flex-shrink: 0;
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.favorite-missing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  opacity: 0.5;
+  font-size: 0.88rem;
+}
+
+.favorite-missing-label {
+  font-size: 0.75rem;
+  font-style: italic;
+  margin-left: auto;
+}
+
+.favorite-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  color: inherit;
+  opacity: 0.8;
+  padding: 0;
 }
