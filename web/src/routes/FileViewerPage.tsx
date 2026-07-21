@@ -80,16 +80,19 @@ export function FileViewerPage() {
     }
     const scrollEl = outletContext?.contentRef?.current;
     const prevScrollTop = scrollEl?.scrollTop ?? 0;
-    ds.getFile(workspaceId, wildcardPath).then((f) => {
-      setDeleted(false);
-      suppressNextResetScrollRef.current = true;
-      setFile(f);
-      if (scrollEl) {
-        requestAnimationFrame(() => {
-          scrollEl.scrollTop = prevScrollTop;
-        });
-      }
-    });
+    ds.getFile(workspaceId, wildcardPath).then(
+      (f) => {
+        setDeleted(false);
+        suppressNextResetScrollRef.current = true;
+        setFile(f);
+        if (scrollEl) {
+          requestAnimationFrame(() => {
+            scrollEl.scrollTop = prevScrollTop;
+          });
+        }
+      },
+      (e) => setError(String(e))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outletContext?.fileChangeEvent]);
 

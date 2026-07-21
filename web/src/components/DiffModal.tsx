@@ -45,7 +45,8 @@ export function DiffModal({
         </div>
         {diff === null && <div className="loading">Loading…</div>}
         {diff !== null && !diff.available && <p className="diff-unavailable">No previous version to compare.</p>}
-        {diff !== null && diff.available && (
+        {diff !== null && diff.available && diff.old === diff.new && <p className="diff-unavailable">No changes.</p>}
+        {diff !== null && diff.available && diff.old !== diff.new && (
           <pre className="diff-body">
             {diffLines(diff.old ?? '', diff.new ?? '').map((part, i) => {
               const cls = part.added ? 'diff-line-added' : part.removed ? 'diff-line-removed' : 'diff-line-context';

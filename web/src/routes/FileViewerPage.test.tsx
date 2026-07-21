@@ -156,6 +156,42 @@ describe('FileViewerPage', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'B v2' })).toBeInTheDocument());
   });
 
+  it('shows an error when the live-refetch triggered by a modify event rejects', async () => {
+    (globalThis as any).__testDataSource = {
+      getFile: vi
+        .fn()
+        .mockResolvedValueOnce({ path: 'local/b.md', title: 'B v1', frontmatter: {}, body: 'body v1', headings: [], is_ai_context: false })
+        .mockRejectedValueOnce(new Error('boom')),
+    };
+
+    function ParentWithContext() {
+      const [fileChangeEvent, setFileChangeEvent] = useState<{ sourceId: string; path: string; op: 'modify' } | null>(null);
+      const contentRef = useRef<HTMLElement>(null);
+      return (
+        <div>
+          <button onClick={() => setFileChangeEvent({ sourceId: 'local', path: 'b.md', op: 'modify' })}>simulate modify</button>
+          <Outlet context={{ tree: undefined, scrollToTop: vi.fn(), resetScroll: vi.fn(), contentRef, fileChangeEvent }} />
+        </div>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/w/ws/doc/local/b.md']}>
+        <Routes>
+          <Route element={<ParentWithContext />}>
+            <Route path="/w/:workspaceId/doc/*" element={<FileViewerPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'B v1' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('simulate modify'));
+
+    await waitFor(() => expect(screen.getByText(/failed to load file/i)).toBeInTheDocument());
+  });
+
   it('shows a deleted banner when a matching delete event arrives via outlet context', async () => {
     (globalThis as any).__testDataSource = {
       getFile: vi.fn().mockResolvedValue({ path: 'local/b.md', title: 'B', frontmatter: {}, body: 'body', headings: [], is_ai_context: false }),

@@ -26,6 +26,14 @@ describe('DiffModal', () => {
     await waitFor(() => expect(screen.getByText(/no previous version/i)).toBeInTheDocument());
   });
 
+  it('shows a "no changes" message when the diff is available but old equals new', async () => {
+    (globalThis as any).__testDataSource = {
+      getFileDiff: vi.fn().mockResolvedValue({ available: true, old: 'same\ncontent', new: 'same\ncontent' }),
+    };
+    render(<DiffModal workspaceId="ws" sourceId="local" path="guide.md" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/no changes/i)).toBeInTheDocument());
+  });
+
   it('calls onClose when the close button is clicked', async () => {
     (globalThis as any).__testDataSource = {
       getFileDiff: vi.fn().mockResolvedValue({ available: false }),

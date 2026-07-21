@@ -62,7 +62,10 @@ func watchAndReindex(ctx context.Context, a *app.App, wsID string, src source.So
 		}
 
 		if ev.Op != source.ChangeOpDelete {
-			if newBody, ok, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path); err == nil && ok {
+			newBody, ok, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path)
+			if err != nil {
+				log.Printf("watch %s/%s/%s: read new content failed: %v", wsID, src.ID(), ev.Path, err)
+			} else if ok {
 				base := ""
 				if hadOld {
 					base = oldBody
