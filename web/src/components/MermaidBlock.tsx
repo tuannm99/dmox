@@ -7,6 +7,21 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 4;
 const ZOOM_STEP = 0.25;
 
+/** Nearest ancestor that actually scrolls (used to compensate its scrollTop
+ * for the layout shift mermaid's async render causes — see the render
+ * effect below). */
+function findScrollableAncestor(el: Element): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const style = getComputedStyle(node);
+    if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 export function MermaidBlock({ source }: { source: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +40,29 @@ export function MermaidBlock({ source }: { source: string }) {
     mermaid
       .render(id, source)
       .then(({ svg }) => {
-        if (ref.current) ref.current.innerHTML = svg;
+        const el = ref.current;
+        if (!el) return;
+        // mermaid.render() is async, so this element is empty (near-zero
+        // height) until now, when it can suddenly grow to thousands of
+        // pixels — a real, unavoidable layout shift since the diagram's
+        // size isn't known until render completes. If the page is already
+        // scrolled past where this diagram STARTS (its top edge, which
+        // insertion doesn't move — only its bottom edge moves down), that
+        // growth happens right at the user's current position, and their
+        // view silently jumps to content near the top of the (now much
+        // taller) diagram instead of what they were actually looking at.
+        // Compensate by shifting scrollTop by exactly the height delta, so
+        // the user's visual position doesn't move. (.content deliberately
+        // disables the browser's own scroll anchoring — see styles.css — so
+        // nothing else does this automatically.)
+        const scrollParent = findScrollableAncestor(el);
+        const heightBefore = el.getBoundingClientRect().height;
+        const pastTop = scrollParent ? el.getBoundingClientRect().top <= scrollParent.getBoundingClientRect().top : false;
+        el.innerHTML = svg;
+        if (scrollParent && pastTop) {
+          const heightAfter = el.getBoundingClientRect().height;
+          scrollParent.scrollTop += heightAfter - heightBefore;
+        }
       })
       .catch((e: unknown) => setError(String(e)));
   }, [source]);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('mermaid', () => ({
@@ -91,6 +91,86 @@ describe('MermaidBlock', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '125%' })); // reset
     expect(diagram.style.touchAction).toBe('pan-y');
+  });
+
+  describe('scroll compensation for the async-render layout shift', () => {
+    let computedStyleSpy: ReturnType<typeof vi.spyOn>;
+
+    afterEach(() => {
+      computedStyleSpy?.mockRestore();
+    });
+
+    it('shifts the scroll parent by the exact height delta when the diagram, already scrolled past, grows after render', async () => {
+      const mermaid = (await import('mermaid')).default;
+      let resolveRender!: (v: any) => void;
+      vi.mocked(mermaid.render).mockReturnValueOnce(new Promise((resolve) => (resolveRender = resolve)));
+
+      render(
+        <div data-testid="scroll-parent">
+          <MermaidBlock source={SOURCE} />
+        </div>
+      );
+
+      const scrollParent = screen.getByTestId('scroll-parent');
+      Object.defineProperty(scrollParent, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scrollParent, 'clientHeight', { value: 500, configurable: true });
+      scrollParent.scrollTop = 300;
+      vi.spyOn(scrollParent, 'getBoundingClientRect').mockReturnValue({ top: 0 } as DOMRect);
+      computedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockImplementation(
+          (el) => ({ overflowY: el === scrollParent ? 'auto' : 'visible' }) as CSSStyleDeclaration
+        );
+
+      const diagram = screen.getByTestId('mermaid-svg');
+      // Diagram's top sits above the scroll parent's viewport top (-50 <= 0):
+      // the page is already scrolled past where this diagram starts.
+      let rectCalls = 0;
+      vi.spyOn(diagram, 'getBoundingClientRect').mockImplementation(
+        () => ({ top: -50, height: rectCalls++ === 0 ? 20 : 620 }) as DOMRect
+      );
+
+      resolveRender({ svg: '<svg></svg>' });
+      await waitFor(() => expect(diagram.innerHTML).toContain('svg'));
+
+      expect(scrollParent.scrollTop).toBe(300 + (620 - 20));
+    });
+
+    it('does not adjust scroll when the diagram has not been scrolled to yet', async () => {
+      const mermaid = (await import('mermaid')).default;
+      let resolveRender!: (v: any) => void;
+      vi.mocked(mermaid.render).mockReturnValueOnce(new Promise((resolve) => (resolveRender = resolve)));
+
+      render(
+        <div data-testid="scroll-parent">
+          <MermaidBlock source={SOURCE} />
+        </div>
+      );
+
+      const scrollParent = screen.getByTestId('scroll-parent');
+      Object.defineProperty(scrollParent, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scrollParent, 'clientHeight', { value: 500, configurable: true });
+      scrollParent.scrollTop = 300;
+      vi.spyOn(scrollParent, 'getBoundingClientRect').mockReturnValue({ top: 0 } as DOMRect);
+      computedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockImplementation(
+          (el) => ({ overflowY: el === scrollParent ? 'auto' : 'visible' }) as CSSStyleDeclaration
+        );
+
+      const diagram = screen.getByTestId('mermaid-svg');
+      // Diagram's top is below the scroll parent's viewport top (200 > 0):
+      // still ahead of the user, not yet reached.
+      let rectCalls = 0;
+      vi.spyOn(diagram, 'getBoundingClientRect').mockImplementation(
+        () => ({ top: 200, height: rectCalls++ === 0 ? 20 : 620 }) as DOMRect
+      );
+
+      resolveRender({ svg: '<svg></svg>' });
+      await waitFor(() => expect(diagram.innerHTML).toContain('svg'));
+
+      expect(scrollParent.scrollTop).toBe(300);
+    });
   });
 
   it('toggles to a code view showing the raw source, hiding the zoom controls, and back', async () => {
