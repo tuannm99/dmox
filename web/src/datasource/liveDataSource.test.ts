@@ -99,4 +99,35 @@ describe('createLiveDataSource getFileDiff', () => {
     await ds.getFileDiff('ws', 'local', 'a b.md');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/workspaces/ws/file/diff?path=a%20b.md&source=local');
   });
+
+  it('dedupes two concurrent calls for the same diff into a single fetch (regression for StrictMode double-invoke)', async () => {
+    let resolveFetch!: (v: any) => void;
+    (globalThis.fetch as any).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+    const ds = createLiveDataSource();
+
+    // Two calls fired back-to-back before the first resolves, simulating
+    // React StrictMode's mount -> cleanup -> mount double-invoke of an effect
+    // that calls getFileDiff.
+    const p1 = ds.getFileDiff('ws', 'local', 'a.md');
+    const p2 = ds.getFileDiff('ws', 'local', 'a.md');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    resolveFetch({ ok: true, json: async () => ({ available: true, old: 'x', new: 'y' }) });
+    const [d1, d2] = await Promise.all([p1, p2]);
+    expect(d1).toEqual({ available: true, old: 'x', new: 'y' });
+    expect(d2).toEqual({ available: true, old: 'x', new: 'y' });
+
+    // A third call made after the first two have already resolved is a
+    // genuinely new request and must hit the network again — dedup must not
+    // apply forever.
+    (globalThis.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => ({ available: false }) });
+    await ds.getFileDiff('ws', 'local', 'a.md');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
 });

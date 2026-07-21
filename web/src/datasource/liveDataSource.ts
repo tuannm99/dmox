@@ -11,6 +11,18 @@ async function getJSON<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Diff fetches are backed by a consume-once server-side cache (GET
+// /file/diff deletes the entry it returns), so two concurrent requests for
+// the same URL must not both hit the network — the second would always find
+// the entry already gone. React StrictMode's dev-mode double-invoke of
+// effects (mount -> cleanup -> mount) is exactly this shape: DiffModal's
+// fetch effect can fire getFileDiff twice back-to-back before either
+// resolves. Deduplicating in-flight requests here (module scope, so it
+// survives across multiple createLiveDataSource() calls within one page
+// load, e.g. if a provider using it is itself double-invoked) makes the two
+// calls share one real HTTP request instead of racing each other.
+const inFlightDiffRequests = new Map<string, Promise<FileDiff>>();
+
 export function createLiveDataSource(baseURL = ''): DataSource {
   return {
     listWorkspaces: () => getJSON<Workspace[]>(`${baseURL}/api/workspaces`),
@@ -36,9 +48,13 @@ export function createLiveDataSource(baseURL = ''): DataSource {
       });
       return () => es.close();
     },
-    getFileDiff: (workspaceId, sourceId, path) =>
-      getJSON<FileDiff>(
-        `${baseURL}/api/workspaces/${workspaceId}/file/diff?path=${encodeURIComponent(path)}&source=${encodeURIComponent(sourceId)}`
-      ),
+    getFileDiff: (workspaceId, sourceId, path) => {
+      const url = `${baseURL}/api/workspaces/${workspaceId}/file/diff?path=${encodeURIComponent(path)}&source=${encodeURIComponent(sourceId)}`;
+      const existing = inFlightDiffRequests.get(url);
+      if (existing) return existing;
+      const request = getJSON<FileDiff>(url).finally(() => inFlightDiffRequests.delete(url));
+      inFlightDiffRequests.set(url, request);
+      return request;
+    },
   };
 }
