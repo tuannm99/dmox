@@ -15,6 +15,7 @@ export function FileViewerPage() {
   const ds = useDataSource();
   const [file, setFile] = useState<FileView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +38,38 @@ export function FileViewerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
+  // Reset the deleted-banner whenever we navigate to a different file — it
+  // must not persist onto the next file just because it was set on this one.
+  useEffect(() => {
+    setDeleted(false);
+  }, [wildcardPath]);
+
+  // React to a live-change event for the currently-open file (already
+  // pre-filtered by WorkspaceLayout to match this file's path). A delete
+  // shows a persistent banner; a modify/create refetches in place and
+  // restores the scroll position afterwards via requestAnimationFrame, which
+  // runs after the [file]-effect above has already fired resetScroll for
+  // this same update, so our restore wins and is the final scroll position.
+  useEffect(() => {
+    const ev = outletContext?.fileChangeEvent;
+    if (!ev) return;
+    if (ev.op === 'delete') {
+      setDeleted(true);
+      return;
+    }
+    const scrollEl = outletContext?.contentRef?.current;
+    const prevScrollTop = scrollEl?.scrollTop ?? 0;
+    ds.getFile(workspaceId, wildcardPath).then((f) => {
+      setFile(f);
+      if (scrollEl) {
+        requestAnimationFrame(() => {
+          scrollEl.scrollTop = prevScrollTop;
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletContext?.fileChangeEvent]);
+
   const { prevPath, nextPath } = useMemo(() => {
     if (!outletContext?.tree) return { prevPath: undefined, nextPath: undefined };
     const leaves = flattenLeaves(outletContext.tree);
@@ -49,6 +82,14 @@ export function FileViewerPage() {
 
   if (error) return <div className="error">Failed to load file: {error}</div>;
   if (!file) return <div className="loading">Loading…</div>;
+  if (deleted) {
+    return (
+      <article>
+        <div className="doc-breadcrumb">{wildcardPath.split('/').join(' / ')}</div>
+        <div className="file-deleted-banner">This file was deleted.</div>
+      </article>
+    );
+  }
 
   return (
     <article>
