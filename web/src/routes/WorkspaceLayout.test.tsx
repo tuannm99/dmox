@@ -4,9 +4,12 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { WorkspaceLayout } from './WorkspaceLayout';
 import { DataSourceProvider } from '../datasource/context';
 
-// jsdom doesn't implement Element.scrollTo — polyfill it so it can be spied on.
+// jsdom doesn't implement Element.scrollTo / scrollIntoView — polyfill both so they can be spied on.
 if (!HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = () => {};
+}
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
 }
 
 class MockWebSocket {
@@ -314,5 +317,75 @@ describe('WorkspaceLayout', () => {
     await screen.findByText('welcome');
     unmount();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('directories default to collapsed, hiding the tree files', async () => {
+    const ds = {
+      getTree: vi.fn().mockResolvedValue({
+        name: 'WS',
+        path: '',
+        is_dir: true,
+        children: [{ name: 'local', path: 'local', is_dir: true, children: [{ name: 'guide.md', path: 'local/guide.md', is_dir: false }] }],
+      }),
+    };
+    renderWithDataSource(ds);
+    await screen.findByRole('button', { name: 'local' });
+    expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+  });
+
+  it('reveals the active file on load by auto-expanding its ancestor folders and scrolling it into view', async () => {
+    const scrollIntoViewSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const ds = {
+      getTree: vi.fn().mockResolvedValue({
+        name: 'WS',
+        path: '',
+        is_dir: true,
+        children: [
+          {
+            name: 'local',
+            path: 'local',
+            is_dir: true,
+            children: [
+              {
+                name: 'sub',
+                path: 'local/sub',
+                is_dir: true,
+                children: [{ name: 'nested.md', path: 'local/sub/nested.md', is_dir: false }],
+              },
+            ],
+          },
+        ],
+      }),
+    };
+    (globalThis as any).__testDataSource = ds;
+    render(
+      <MemoryRouter initialEntries={['/w/ws/doc/local/sub/nested.md']}>
+        <Routes>
+          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            <Route path="doc/*" element={<div>doc page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const link = await screen.findByRole('link', { name: 'nested.md' });
+    expect(link).toHaveClass('active');
+    await waitFor(() => expect(scrollIntoViewSpy).toHaveBeenCalled());
+    scrollIntoViewSpy.mockRestore();
+  });
+
+  it('remembers a manually expanded folder across a remount (simulating a page reload)', async () => {
+    const tree = { name: 'WS', path: '', is_dir: true, children: [{ name: 'local', path: 'local', is_dir: true, children: [{ name: 'guide.md', path: 'local/guide.md', is_dir: false }] }] };
+    const ds = { getTree: vi.fn().mockResolvedValue(tree) };
+    const { unmount } = renderWithDataSource(ds);
+    await screen.findByRole('button', { name: 'local' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'local' }));
+    expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
+    unmount();
+
+    renderWithDataSource(ds);
+    await screen.findByRole('button', { name: 'local' });
+    expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
   });
 });

@@ -15,25 +15,58 @@ const tree: TreeNode = {
 };
 
 describe('TreeView', () => {
-  it('renders a link for each file with the correct href', () => {
+  it('directories are collapsed by default', () => {
     render(
       <MemoryRouter>
         <TreeView node={tree} workspaceId="ws" />
       </MemoryRouter>
     );
+    expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+  });
+
+  it('renders a link for each file with the correct href once expanded', () => {
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /local/ }));
     const link = screen.getByRole('link', { name: 'guide.md' });
     expect(link).toHaveAttribute('href', '/w/ws/doc/local/guide.md');
   });
 
-  it('collapses and expands a directory on click', () => {
+  it('collapses an expanded directory on a second click', () => {
     render(
       <MemoryRouter>
         <TreeView node={tree} workspaceId="ws" />
       </MemoryRouter>
     );
+    fireEvent.click(screen.getByRole('button', { name: /local/ }));
     expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /local/ }));
     expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+  });
+
+  it('respects isExpanded/onToggleExpanded as a controlled expand state', () => {
+    const onToggleExpanded = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" isExpanded={() => false} onToggleExpanded={onToggleExpanded} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /local/ }));
+    expect(onToggleExpanded).toHaveBeenCalledWith('local');
+    // controlled: clicking alone doesn't change what's rendered until isExpanded itself changes
+    expect(screen.queryByRole('link', { name: 'guide.md' })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" isExpanded={(path) => path === 'local'} onToggleExpanded={onToggleExpanded} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
   });
 
   it('renders no favorite toggle when onToggleFavorite is not provided', () => {
@@ -53,6 +86,7 @@ describe('TreeView', () => {
         <TreeView node={tree} workspaceId="ws" isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />
       </MemoryRouter>
     );
+    fireEvent.click(screen.getByRole('button', { name: 'local' }));
 
     expect(screen.getByRole('button', { name: 'Remove guide.md from favorites' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add local to favorites' })).toBeInTheDocument();
@@ -68,6 +102,7 @@ describe('TreeView', () => {
         <TreeView node={tree} workspaceId="ws" isFavorite={() => false} onToggleFavorite={onToggleFavorite} />
       </MemoryRouter>
     );
+    fireEvent.click(screen.getByRole('button', { name: 'local' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Add local to favorites' }));
     // the directory should still be expanded (favorite click didn't also collapse it)

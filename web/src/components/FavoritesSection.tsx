@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TreeView, findNodeByPath } from './TreeView';
+import { TreeView, findNodeByPath, type TreeExpandProps } from './TreeView';
 import type { TreeNode } from '../datasource/types';
 import type { FavoriteEntry } from '../useFavorites';
 
@@ -11,6 +10,8 @@ export function FavoritesSection({
   favorites,
   isFavorite,
   onToggleFavorite,
+  isExpanded,
+  onToggleExpanded,
 }: {
   tree: TreeNode;
   workspaceId: string;
@@ -18,22 +19,8 @@ export function FavoritesSection({
   favorites: FavoriteEntry[];
   isFavorite: (path: string) => boolean;
   onToggleFavorite: (entry: FavoriteEntry) => void;
-}) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
+} & TreeExpandProps) {
   if (favorites.length === 0) return null;
-
-  function toggleExpanded(path: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  }
 
   return (
     <div className="favorites-section">
@@ -41,6 +28,17 @@ export function FavoritesSection({
       <ul className="favorites-list">
         {favorites.map((favorite) => {
           const resolved = findNodeByPath(tree, favorite.path);
+          const removeButton = (
+            <button
+              type="button"
+              className="favorite-remove"
+              aria-label={`Remove ${favorite.name} from favorites`}
+              onClick={() => onToggleFavorite(favorite)}
+            >
+              ✕
+            </button>
+          );
+
           if (!resolved) {
             return (
               <li key={favorite.path} className="favorite-item favorite-missing">
@@ -49,26 +47,28 @@ export function FavoritesSection({
                 </span>
                 <span className="favorite-name">{favorite.name}</span>
                 <span className="favorite-missing-label">Missing</span>
-                <button type="button" className="favorite-remove" onClick={() => onToggleFavorite(favorite)}>
-                  Remove
-                </button>
+                {removeButton}
               </li>
             );
           }
 
           if (resolved.is_dir) {
-            const open = expanded.has(favorite.path);
+            const open = isExpanded?.(favorite.path) ?? false;
+            const toggleOpen = () => onToggleExpanded?.(favorite.path);
             return (
               <li key={favorite.path} className="favorite-item">
-                <button type="button" className="favorite-folder-toggle" onClick={() => toggleExpanded(favorite.path)}>
-                  <span className="tree-chevron" aria-hidden="true">
-                    {open ? '▾' : '▸'}
-                  </span>
-                  <span className="favorite-icon" aria-hidden="true">
-                    {open ? '📂' : '📁'}
-                  </span>
-                  {favorite.name}
-                </button>
+                <div className="favorite-row">
+                  <button type="button" className="favorite-folder-toggle" onClick={toggleOpen}>
+                    <span className="tree-chevron" aria-hidden="true">
+                      {open ? '▾' : '▸'}
+                    </span>
+                    <span className="favorite-icon" aria-hidden="true">
+                      {open ? '📂' : '📁'}
+                    </span>
+                    {favorite.name}
+                  </button>
+                  {removeButton}
+                </div>
                 {open && (
                   <TreeView
                     node={resolved}
@@ -76,6 +76,8 @@ export function FavoritesSection({
                     currentPath={currentPath}
                     isFavorite={isFavorite}
                     onToggleFavorite={onToggleFavorite}
+                    isExpanded={isExpanded}
+                    onToggleExpanded={onToggleExpanded}
                   />
                 )}
               </li>
@@ -85,15 +87,18 @@ export function FavoritesSection({
           const active = resolved.path === currentPath;
           return (
             <li key={favorite.path} className="favorite-item">
-              <Link
-                className={active ? 'favorite-file active' : 'favorite-file'}
-                to={`/w/${workspaceId}/doc/${resolved.path}`}
-              >
-                <span className="favorite-icon" aria-hidden="true">
-                  📄
-                </span>
-                {favorite.name}
-              </Link>
+              <div className="favorite-row">
+                <Link
+                  className={active ? 'favorite-file active' : 'favorite-file'}
+                  to={`/w/${workspaceId}/doc/${resolved.path}`}
+                >
+                  <span className="favorite-icon" aria-hidden="true">
+                    📄
+                  </span>
+                  {favorite.name}
+                </Link>
+                {removeButton}
+              </div>
             </li>
           );
         })}

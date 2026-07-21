@@ -60,17 +60,25 @@ function FavoriteToggle({
   );
 }
 
+export interface TreeExpandProps {
+  isExpanded?: (path: string) => boolean;
+  onToggleExpanded?: (path: string) => void;
+}
+
 export function TreeView({
   node,
   workspaceId,
   currentPath,
   isFavorite,
   onToggleFavorite,
+  isExpanded,
+  onToggleExpanded,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
-} & TreeFavoriteProps) {
+} & TreeFavoriteProps &
+  TreeExpandProps) {
   return (
     <ul className="tree">
       {sortedChildren(node).map((child) => (
@@ -81,6 +89,8 @@ export function TreeView({
           currentPath={currentPath}
           isFavorite={isFavorite}
           onToggleFavorite={onToggleFavorite}
+          isExpanded={isExpanded}
+          onToggleExpanded={onToggleExpanded}
         />
       ))}
     </ul>
@@ -93,17 +103,32 @@ function TreeNodeItem({
   currentPath,
   isFavorite,
   onToggleFavorite,
+  isExpanded,
+  onToggleExpanded,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
-} & TreeFavoriteProps) {
-  const [open, setOpen] = useState(true);
+} & TreeFavoriteProps &
+  TreeExpandProps) {
+  // Uncontrolled fallback (no isExpanded/onToggleExpanded passed) still
+  // defaults to collapsed, matching the controlled default — nothing about
+  // "not persisted" should mean "open by default".
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = isExpanded ? isExpanded(node.path) : localOpen;
+  const toggleOpen = () => {
+    if (onToggleExpanded) {
+      onToggleExpanded(node.path);
+    } else {
+      setLocalOpen((o) => !o);
+    }
+  };
+
   if (node.is_dir) {
     return (
       <li>
         <div className="tree-row">
-          <button type="button" className="tree-dir" onClick={() => setOpen((o) => !o)}>
+          <button type="button" className="tree-dir" onClick={toggleOpen}>
             <span className="tree-chevron" aria-hidden="true">
               {open ? '▾' : '▸'}
             </span>
@@ -124,6 +149,8 @@ function TreeNodeItem({
                 currentPath={currentPath}
                 isFavorite={isFavorite}
                 onToggleFavorite={onToggleFavorite}
+                isExpanded={isExpanded}
+                onToggleExpanded={onToggleExpanded}
               />
             ))}
           </ul>

@@ -12,6 +12,7 @@ import { ToastStack, type ToastItem } from '../components/ToastStack';
 import { DiffModal } from '../components/DiffModal';
 import { FavoritesSection } from '../components/FavoritesSection';
 import { useFavorites } from '../useFavorites';
+import { useExpandedFolders } from '../useExpandedFolders';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
@@ -59,8 +60,11 @@ export function WorkspaceLayout() {
   const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string } | null>(null);
   const [fileChangeEvent, setFileChangeEvent] = useState<ChangeEvent | null>(null);
   const { favorites, toggleFavorite, isFavorite } = useFavorites(workspaceId);
+  const { isExpanded, toggleExpanded, expandAncestors } = useExpandedFolders(workspaceId);
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const contentRef = useRef<HTMLElement>(null);
+  const sidebarTreeRef = useRef<HTMLDivElement>(null);
+  const hasRevealedActiveRef = useRef(false);
   const currentPathRef = useRef<string | undefined>(undefined);
   const treeRefetchTimer = useRef<ReturnType<typeof setTimeout>>();
   const toastIdRef = useRef(0);
@@ -78,6 +82,7 @@ export function WorkspaceLayout() {
     setError(null);
     setActivePanel(null);
     setOpenedPanels(new Set());
+    hasRevealedActiveRef.current = false;
     ds.getTree(workspaceId).then(
       (t) => !cancelled && setTree(t),
       (e) => !cancelled && setError(String(e))
@@ -86,6 +91,21 @@ export function WorkspaceLayout() {
       cancelled = true;
     };
   }, [ds, workspaceId]);
+
+  // Reveal the currently-active file in the tree once per workspace load
+  // (including on a hard page reload): expand its ancestor folders — the
+  // tree is collapsed by default otherwise — then scroll it into view.
+  // Gated by hasRevealedActiveRef so it doesn't fight a manual collapse the
+  // user makes later in the same session (e.g. on a live-reload tree
+  // refetch), only on the initial reveal after (re)loading this workspace.
+  useEffect(() => {
+    if (!tree || !currentPath || hasRevealedActiveRef.current) return;
+    hasRevealedActiveRef.current = true;
+    expandAncestors(currentPath);
+    requestAnimationFrame(() => {
+      sidebarTreeRef.current?.querySelector('.tree-file.active')?.scrollIntoView({ block: 'nearest' });
+    });
+  }, [tree, currentPath, expandAncestors]);
 
   // Long-lived subscription to live-change events for this workspace. Kept
   // as its own effect (deps: [ds, workspaceId] only) so it doesn't tear down
@@ -246,14 +266,20 @@ export function WorkspaceLayout() {
             favorites={favorites}
             isFavorite={isFavorite}
             onToggleFavorite={toggleFavorite}
+            isExpanded={isExpanded}
+            onToggleExpanded={toggleExpanded}
           />
-          <TreeView
-            node={tree}
-            workspaceId={workspaceId}
-            currentPath={currentPath}
-            isFavorite={isFavorite}
-            onToggleFavorite={toggleFavorite}
-          />
+          <div className="sidebar-tree" ref={sidebarTreeRef}>
+            <TreeView
+              node={tree}
+              workspaceId={workspaceId}
+              currentPath={currentPath}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              isExpanded={isExpanded}
+              onToggleExpanded={toggleExpanded}
+            />
+          </div>
         </nav>
         <div
           className="sidebar-resizer"

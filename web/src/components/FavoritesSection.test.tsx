@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -22,18 +23,43 @@ const tree: TreeNode = {
   ],
 };
 
+function Wrapper({
+  favorites,
+  onToggleFavorite,
+  overrides,
+}: {
+  favorites: FavoriteEntry[];
+  onToggleFavorite: (entry: FavoriteEntry) => void;
+  overrides: Partial<Parameters<typeof FavoritesSection>[0]>;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+  return (
+    <FavoritesSection
+      tree={tree}
+      workspaceId="ws"
+      favorites={favorites}
+      isFavorite={(path) => favorites.some((f) => f.path === path)}
+      onToggleFavorite={onToggleFavorite}
+      isExpanded={(path) => expanded.has(path)}
+      onToggleExpanded={toggleExpanded}
+      {...overrides}
+    />
+  );
+}
+
 function renderSection(favorites: FavoriteEntry[], overrides: Partial<Parameters<typeof FavoritesSection>[0]> = {}) {
   const onToggleFavorite = vi.fn();
   const utils = render(
     <MemoryRouter>
-      <FavoritesSection
-        tree={tree}
-        workspaceId="ws"
-        favorites={favorites}
-        isFavorite={(path) => favorites.some((f) => f.path === path)}
-        onToggleFavorite={onToggleFavorite}
-        {...overrides}
-      />
+      <Wrapper favorites={favorites} onToggleFavorite={onToggleFavorite} overrides={overrides} />
     </MemoryRouter>
   );
   return { ...utils, onToggleFavorite };
@@ -64,15 +90,32 @@ describe('FavoritesSection', () => {
     renderSection([{ path: 'local/sub', isDir: true, name: 'sub' }]);
     expect(screen.queryByRole('link', { name: /nested\.md/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /sub/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'sub' }));
     expect(screen.getByRole('link', { name: /nested\.md/ })).toBeInTheDocument();
   });
 
   it('renders favorite toggles inside an expanded favorited folder too', () => {
     const { onToggleFavorite } = renderSection([{ path: 'local/sub', isDir: true, name: 'sub' }]);
-    fireEvent.click(screen.getByRole('button', { name: /sub/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'sub' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Add nested.md to favorites' }));
     expect(onToggleFavorite).toHaveBeenCalledWith({ path: 'local/sub/nested.md', isDir: false, name: 'nested.md' });
+  });
+
+  it('renders a direct remove button on a favorited file, without needing to hunt through the tree', () => {
+    const { onToggleFavorite } = renderSection([{ path: 'local/guide.md', isDir: false, name: 'guide.md' }]);
+    const removeButton = screen.getByRole('button', { name: 'Remove guide.md from favorites' });
+
+    fireEvent.click(removeButton);
+    expect(onToggleFavorite).toHaveBeenCalledWith({ path: 'local/guide.md', isDir: false, name: 'guide.md' });
+  });
+
+  it('renders a direct remove button on a favorited folder, separate from its expand toggle', () => {
+    const { onToggleFavorite } = renderSection([{ path: 'local/sub', isDir: true, name: 'sub' }]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove sub from favorites' }));
+    expect(onToggleFavorite).toHaveBeenCalledWith({ path: 'local/sub', isDir: true, name: 'sub' });
+    // removing didn't also toggle the folder open
+    expect(screen.queryByRole('link', { name: /nested\.md/ })).not.toBeInTheDocument();
   });
 });

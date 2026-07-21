@@ -98,10 +98,21 @@ body,
 .sidebar {
   flex-shrink: 0;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 1rem;
   box-sizing: border-box;
+}
+
+/* .favorites-section (further down this file) is capped to a max-height and
+   scrolls internally instead — the two scroll independently so Favorites
+   never scrolls out of view while browsing a long tree. */
+.sidebar-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-resizer {
@@ -633,9 +644,17 @@ a.doc-pager-link:hover {
 }
 
 .favorites-section {
+  flex-shrink: 0;
+  max-height: 220px;
+  overflow-y: auto;
   margin-bottom: 0.5rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #8883;
+}
+
+.favorite-row {
+  display: flex;
+  align-items: center;
 }
 
 .favorites-header {
@@ -662,7 +681,8 @@ a.doc-pager-link:hover {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   padding: 0.3rem 0.5rem;
   border-radius: 0.4rem;
@@ -716,9 +736,14 @@ a.doc-pager-link:hover {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.78rem;
-  text-decoration: underline;
+  font-size: 0.8em;
+  line-height: 1;
   color: inherit;
-  opacity: 0.8;
-  padding: 0;
+  opacity: 0.5;
+  padding: 0.2rem 0.4rem;
+}
+
+.favorite-remove:hover {
+  opacity: 1;
+  color: #f87171;
 }
