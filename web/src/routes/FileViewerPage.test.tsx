@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { FileViewerPage } from './FileViewerPage';
 import type { TreeNode } from '../datasource/types';
 
@@ -264,5 +264,81 @@ describe('FileViewerPage', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'B v2' })).toBeInTheDocument());
     expect(screen.queryByText(/this file was deleted/i)).not.toBeInTheDocument();
+  });
+
+  describe('scroll memory', () => {
+    // jsdom has no layout, so give the content pane a fake scrolling box.
+    function ParentWithScrollableContent({ resetScroll }: { resetScroll: () => void }) {
+      const contentRef = useRef<HTMLElement>(null);
+      const attach = (node: HTMLElement | null) => {
+        if (node && contentRef.current !== node) {
+          let top = 0;
+          Object.defineProperty(node, 'scrollTop', {
+            get: () => top,
+            set: (v: number) => {
+              top = v;
+            },
+            configurable: true,
+          });
+          (contentRef as { current: HTMLElement | null }).current = node;
+        }
+      };
+      return (
+        <main className="content" ref={attach}>
+          <Link to="/w/ws/doc/local/c.md">open c</Link>
+          <Outlet context={{ tree: undefined, scrollToTop: vi.fn(), resetScroll, contentRef, fileChangeEvent: null }} />
+        </main>
+      );
+    }
+
+    function renderAt(path: string) {
+      const resetScroll = vi.fn();
+      (globalThis as any).__testDataSource = {
+        getFile: vi.fn().mockResolvedValue({ path: 'local/c.md', title: 'C', frontmatter: {}, body: 'body', headings: [], is_ai_context: false }),
+      };
+      const utils = render(
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route element={<ParentWithScrollableContent resetScroll={resetScroll} />}>
+              <Route path="/w/:workspaceId" element={<div>index</div>} />
+              <Route path="/w/:workspaceId/doc/*" element={<FileViewerPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      );
+      return { ...utils, resetScroll, content: () => utils.container.querySelector('.content') as HTMLElement };
+    }
+
+    it('records the reader position and restores it on a reload', async () => {
+      sessionStorage.clear();
+      const first = renderAt('/w/ws/doc/local/c.md');
+      await screen.findByRole('heading', { name: 'C' });
+
+      first.content().scrollTop = 640;
+      fireEvent.scroll(first.content());
+      await waitFor(() => expect(sessionStorage.getItem('dmox-scroll-ws:local/c.md')).toBe('640'));
+      first.unmount();
+
+      // A MemoryRouter's initial entry is a POP — the same navigation type a
+      // browser reload produces.
+      const reloaded = renderAt('/w/ws/doc/local/c.md');
+      await screen.findByRole('heading', { name: 'C' });
+      await waitFor(() => expect(reloaded.content().scrollTop).toBe(640));
+      expect(reloaded.resetScroll).not.toHaveBeenCalled();
+    });
+
+    it('still starts at the top when the doc is opened fresh rather than reloaded', async () => {
+      sessionStorage.clear();
+      sessionStorage.setItem('dmox-scroll-ws:local/c.md', '640');
+      const view = renderAt('/w/ws');
+      await screen.findByText('index');
+
+      // Clicking a link is a PUSH, not a POP: a fresh read starts at the top.
+      fireEvent.click(screen.getByRole('link', { name: 'open c' }));
+      await screen.findByRole('heading', { name: 'C' });
+
+      expect(view.resetScroll).toHaveBeenCalled();
+      expect(view.content().scrollTop).toBe(0);
+    });
   });
 });

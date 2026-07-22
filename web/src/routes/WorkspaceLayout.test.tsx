@@ -388,4 +388,39 @@ describe('WorkspaceLayout', () => {
     await screen.findByRole('button', { name: 'local' });
     expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
   });
+
+  it('reopens the right panel it was left on across a remount (simulating a page reload)', async () => {
+    const ds = {
+      getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }),
+      search: vi.fn().mockResolvedValue([]),
+    };
+    const { unmount } = renderWithDataSource(ds);
+    await screen.findByRole('button', { name: /search/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    expect(await screen.findByRole('button', { name: 'Close panel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /search/i })).toHaveAttribute('aria-pressed', 'true');
+    unmount();
+
+    renderWithDataSource(ds);
+    expect(await screen.findByRole('button', { name: 'Close panel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /search/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not reopen the terminal across a remount, so a reload never spawns a shell', async () => {
+    const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
+    const { unmount } = renderWithDataSource(ds);
+    await screen.findByRole('button', { name: /terminal/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /terminal/i }));
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    unmount();
+
+    MockWebSocket.instances = [];
+    renderWithDataSource(ds);
+    await screen.findByRole('button', { name: /terminal/i });
+    expect(screen.getByRole('button', { name: /terminal/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Close panel' })).not.toBeInTheDocument();
+    expect(MockWebSocket.instances).toHaveLength(0);
+  });
 });

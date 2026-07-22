@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useNavigationType, useOutletContext, useParams } from 'react-router-dom';
+import { readScrollTop, restoreScrollTop, saveScrollTop } from '../scrollMemory';
 import { useDataSource } from '../datasource/context';
 import { MarkdownView } from '../components/MarkdownView';
 import { GitHistoryPanel } from '../components/GitHistoryPanel';
@@ -21,6 +22,8 @@ export function FileViewerPage() {
   // live in-place refresh of the same file" apart from "this update is a
   // genuine navigation to a different file" — see that effect for why.
   const suppressNextResetScrollRef = useRef(false);
+  const navigationType = useNavigationType();
+  const restoredForRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,15 +50,44 @@ export function FileViewerPage() {
   // call; we consume (and clear) that flag here instead of calling
   // resetScroll(), so the two effects cooperate deterministically regardless
   // of effect-flush/rAF scheduling order.
+  // A reload or a back/forward (navigationType 'POP') should land you where
+  // you left off; clicking into a doc is a fresh read and still starts at the
+  // top. Guarded per path so a live-refetch or a re-render doesn't yank the
+  // page back to a stale offset after you've scrolled away from it.
   useEffect(() => {
     if (!file) return;
     if (suppressNextResetScrollRef.current) {
       suppressNextResetScrollRef.current = false;
       return;
     }
+    const el = outletContext?.contentRef?.current;
+    const saved = readScrollTop(workspaceId, wildcardPath);
+    if (el && saved > 0 && navigationType === 'POP' && restoredForRef.current !== wildcardPath) {
+      restoredForRef.current = wildcardPath;
+      return restoreScrollTop(el, saved);
+    }
     outletContext?.resetScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
+
+  // Remember where the reader got to. Debounced because scroll fires per
+  // frame, and only attached once the file is on screen so the reset-to-top
+  // above can't be recorded as a real position.
+  useEffect(() => {
+    const el = outletContext?.contentRef?.current;
+    if (!el || !file) return;
+    let timer: ReturnType<typeof setTimeout>;
+    function onScroll() {
+      clearTimeout(timer);
+      timer = setTimeout(() => saveScrollTop(workspaceId, wildcardPath, el!.scrollTop), 150);
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', onScroll);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, workspaceId, wildcardPath]);
 
   // Reset the deleted-banner whenever we navigate to a different file — it
   // must not persist onto the next file just because it was set on this one.

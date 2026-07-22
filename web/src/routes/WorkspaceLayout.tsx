@@ -13,6 +13,7 @@ import { DiffModal } from '../components/DiffModal';
 import { FavoritesSection } from '../components/FavoritesSection';
 import { useFavorites } from '../useFavorites';
 import { useExpandedFolders } from '../useExpandedFolders';
+import { useActivePanel } from '../useActivePanel';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
@@ -53,8 +54,7 @@ export function WorkspaceLayout() {
   const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
   const [dragging, setDragging] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [activePanel, setActivePanel] = useState<PanelKind | null>(null);
-  const [openedPanels, setOpenedPanels] = useState<Set<PanelKind>>(new Set());
+  const { activePanel, openedPanels, setActivePanel, togglePanel } = useActivePanel(workspaceId);
   const [keymap, setKeymap] = useState<Keymap>(defaultKeymap);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string } | null>(null);
@@ -80,8 +80,6 @@ export function WorkspaceLayout() {
     let cancelled = false;
     setTree(null);
     setError(null);
-    setActivePanel(null);
-    setOpenedPanels(new Set());
     hasRevealedActiveRef.current = false;
     ds.getTree(workspaceId).then(
       (t) => !cancelled && setTree(t),
@@ -190,11 +188,6 @@ export function WorkspaceLayout() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const togglePanel = useCallback((kind: PanelKind) => {
-    setActivePanel((current) => (current === kind ? null : kind));
-    setOpenedPanels((s) => (s.has(kind) ? s : new Set(s).add(kind)));
   }, []);
 
   useEffect(() => {
