@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, createEvent, waitFor } from '@testing-library/react';
 
 vi.mock('mermaid', () => ({
   default: {
@@ -74,6 +74,65 @@ describe('MermaidBlock', () => {
     fireEvent.wheel(wrapper, { deltaY: -500 });
 
     expect(diagram.style.transform).toBe('translate(0px, 0px) scale(1)');
+  });
+
+  it('zooms on Ctrl/Cmd + wheel and prevents the browser from zooming the page instead', async () => {
+    render(<MermaidBlock source={SOURCE} />);
+    const diagram = await screen.findByTestId('mermaid-svg');
+
+    const zoomIn = createEvent.wheel(diagram, { deltaY: -100, ctrlKey: true });
+    fireEvent(diagram, zoomIn);
+    expect(zoomIn.defaultPrevented).toBe(true);
+    expect(screen.getByRole('button', { name: '122%' })).toBeInTheDocument();
+
+    fireEvent(diagram, createEvent.wheel(diagram, { deltaY: 100, metaKey: true }));
+    expect(screen.getByRole('button', { name: '100%' })).toBeInTheDocument();
+  });
+
+  it('leaves a wheel without Ctrl/Cmd to the page so a tall diagram still scrolls past', async () => {
+    render(<MermaidBlock source={SOURCE} />);
+    const diagram = await screen.findByTestId('mermaid-svg');
+
+    const ev = createEvent.wheel(diagram, { deltaY: -500 });
+    fireEvent(diagram, ev);
+
+    expect(ev.defaultPrevented).toBe(false);
+    expect(diagram.style.transform).toBe('translate(0px, 0px) scale(1)');
+  });
+
+  it('does not select text while dragging to pan, and shows a grabbing cursor', async () => {
+    render(<MermaidBlock source={SOURCE} />);
+    const diagram = await screen.findByTestId('mermaid-svg');
+    diagram.setPointerCapture = vi.fn();
+
+    // At 100% there is nothing to pan, so text stays selectable as usual.
+    expect(diagram.style.userSelect).toBe('auto');
+    expect(diagram.style.cursor).toBe('default');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(diagram.style.userSelect).toBe('none');
+    expect(diagram.style.cursor).toBe('grab');
+
+    // jsdom has no PointerEvent constructor, so createEvent falls back to a
+    // plain Event and drops the coordinates — put them back by hand.
+    const withCoords = (ev: Event, x: number, y: number) => {
+      Object.defineProperty(ev, 'clientX', { value: x });
+      Object.defineProperty(ev, 'clientY', { value: y });
+      return ev;
+    };
+
+    const down = withCoords(createEvent.pointerDown(diagram, { pointerId: 1 }), 100, 100);
+    fireEvent(diagram, down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(diagram.style.cursor).toBe('grabbing');
+
+    fireEvent(diagram, withCoords(createEvent.pointerMove(diagram, { pointerId: 1 }), 130, 150));
+    expect(diagram.style.transform).toBe('translate(30px, 50px) scale(1.25)');
+
+    fireEvent.pointerUp(diagram, { pointerId: 1 });
+    expect(diagram.style.cursor).toBe('grab');
+    // Releasing the mouse keeps the zoom/pan it was dragged to.
+    expect(diagram.style.transform).toBe('translate(30px, 50px) scale(1.25)');
   });
 
   it('allows normal vertical page scroll through the diagram at 100% zoom (touch-action: pan-y)', async () => {

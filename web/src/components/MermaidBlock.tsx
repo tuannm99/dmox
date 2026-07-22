@@ -22,6 +22,8 @@ function findScrollableAncestor(el: Element): HTMLElement | null {
   return null;
 }
 
+const clampScale = (s: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+
 export function MermaidBlock({ source }: { source: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ export function MermaidBlock({ source }: { source: string }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCode, setShowCode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
 
   useEffect(() => {
@@ -67,11 +70,46 @@ export function MermaidBlock({ source }: { source: string }) {
       .catch((e: unknown) => setError(String(e)));
   }, [source]);
 
+  // Ctrl/Cmd + wheel zooms around the pointer, like Excalidraw/Figma/draw.io.
+  // Bound natively rather than via React's onWheel because React attaches
+  // wheel listeners passively at the root, where preventDefault() is ignored
+  // — and without it the browser would run its own page zoom instead. A wheel
+  // without the modifier is left completely alone so the page still scrolls
+  // through a diagram taller than the viewport.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const rect = el!.getBoundingClientRect();
+      setScale((prev) => {
+        const next = clampScale(prev * Math.exp(-e.deltaY * 0.002));
+        if (next === prev) return prev;
+        // Keep whatever sits under the cursor pinned there. The element scales
+        // about its own centre, so a point currently offset `d` from that
+        // centre moves to d * next/prev — cancel that out through pan.
+        const dx = e.clientX - (rect.left + rect.width / 2);
+        const dy = e.clientY - (rect.top + rect.height / 2);
+        const factor = 1 - next / prev;
+        setPan((p) => ({ x: p.x + dx * factor, y: p.y + dy * factor }));
+        return next;
+      });
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (scale === 1) return;
+      // Without this the browser starts its own text/image drag-selection on
+      // the SVG's <text> nodes, so panning paints everything blue instead of
+      // moving the canvas.
+      e.preventDefault();
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       dragRef.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+      setDragging(true);
     },
     [scale, pan]
   );
@@ -83,6 +121,7 @@ export function MermaidBlock({ source }: { source: string }) {
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null;
+    setDragging(false);
   }, []);
 
   const zoomIn = useCallback(() => {
@@ -146,7 +185,11 @@ export function MermaidBlock({ source }: { source: string }) {
         onPointerLeave={handlePointerUp}
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-          cursor: scale > 1 ? 'grab' : 'default',
+          cursor: scale > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
+          // Only while zoomed in, where left-drag means "pan the canvas" — at
+          // 100% there's nothing to pan, so leave the diagram's text
+          // selectable/copyable as normal content.
+          userSelect: scale > 1 ? 'none' : 'auto',
           // Only opt out of native touch/trackpad scrolling once actually
           // zoomed in, when drag-to-pan should take over — at the default
           // 100% there's nothing to pan, so the page must still scroll
