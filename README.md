@@ -1,7 +1,8 @@
 # DMOX
 
-A read-only, local-first, Git-backed documentation browser with search and
-Git history, distributed as a single Go binary. See
+A read-only, local-first, Git-backed documentation browser with search, Git
+history and live reload as files change on disk, distributed as a single Go
+binary. See
 `docs/superpowers/specs/2026-07-17-dmox-core-platform-design.md` for the full
 design.
 
@@ -28,7 +29,11 @@ internal/
   search/             Full-text (FTS5) + optional vector search over the store
   embedprovider/      Embedding provider abstraction (OpenAI implementation)
   render/             Markdown rendering helpers, PlantUML-to-image rendering (cached)
-  gitsvc/             Git history/blame queries against mirrored repos
+  gitsvc/             Two different git reads: history/blame against a GitSource's
+                      mirrored clone, and branch/status/working-diff against the
+                      checkout a LocalSource sits in (see the caching note below)
+  livesync/           Per-workspace change pub/sub (Hub) feeding the SSE stream, plus
+                      a DiffCache holding before/after content for on-demand diffs
   terminal/           PTY-backed shell sessions streamed over WebSocket
   api/                Gin HTTP router: workspace/tree/file/search/git/terminal handlers,
                       plus MountFrontend() which serves the embedded SPA with SPA fallback

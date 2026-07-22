@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 DMOX is a read-only, local-first, Git-backed documentation browser with
-search and Git history, distributed as a single Go binary. Full design doc:
+search, Git history and live reload as files change on disk, distributed as a
+single Go binary. Full design doc:
 `docs/superpowers/specs/2026-07-17-dmox-core-platform-design.md`. Business
 roadmap (self-host-per-company, not multi-tenant): `docs/roadmap/`.
 
@@ -86,7 +87,11 @@ internal/
   search/             Full-text (FTS5) + optional vector search over the store
   embedprovider/      Embedding provider abstraction (OpenAI implementation)
   render/             Markdown rendering helpers, PlantUML-to-image rendering (cached)
-  gitsvc/             Git history/blame queries against mirrored repos
+  gitsvc/             Two different git reads: history/blame against a GitSource's
+                      mirrored clone, and branch/status/working-diff against the
+                      checkout a LocalSource sits in (see the caching note below)
+  livesync/           Per-workspace change pub/sub (Hub) feeding the SSE stream, plus
+                      a DiffCache holding before/after content for on-demand diffs
   terminal/           PTY-backed shell sessions streamed over WebSocket — no auth (see below)
   api/                Gin router: workspace/tree/file/search/git/terminal/keymap handlers,
                       plus MountFrontend() serving the embedded SPA with SPA fallback
@@ -120,6 +125,29 @@ adding auth in front first. This constraint drives real design decisions
 (e.g. Docker image binds to `127.0.0.1` by convention, not `0.0.0.0`; the
 business roadmap's Sprint 2 explicitly gates Terminal behind a feature flag
 + permission check before any multi-user deployment).
+
+**Git working-tree status is expensive and often inapplicable.**
+`gitsvc.WorkingTree()` uses go-git's `Status()`, which hashes the whole
+working tree — measured at ~2s on a mid-sized repo. It is cached per
+directory and invalidated from `watchAndReindex` (`cmd/dmox/serve.go`) when
+the file watcher reports a change, with a 10s TTL as the backstop for what
+the watcher can't see (a `git checkout` happens inside `.git`). Don't call it
+per-request without that cache. Separately, it only means anything for a
+`LocalSource` sitting inside a real checkout: a `GitSource` is a mirrored
+clone with no working tree, and a `docs/` directory mounted into Docker
+without its surrounding repo has no `.git` to find. Both report
+`applicable: false` — an ordinary state the UI hides, not an error.
+
+**Keep react-markdown's `components` map referentially stable**
+(`MarkdownView.tsx`). React compares element types by reference, so building
+that map inline per render hands react-markdown new component types every
+time and remounts the entire document. That isn't just wasted work: it
+re-runs `MermaidBlock`'s async render, so the diagram is empty for a frame,
+`.content`'s `scrollHeight` collapses by the diagram's full height, and the
+browser clamps `scrollTop` — any re-render then throws the reader back to the
+top of a diagram-heavy page. There's a regression test for this in
+`MarkdownView.test.tsx`. The same reasoning applies to any render-prop or
+callback map handed to a component that keys off identity.
 
 Global CSS note: `web/src/styles.css` sets `box-sizing: border-box` on `*`
 globally — required, because `height:100%` + `padding` on the same element
