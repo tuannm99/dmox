@@ -1,12 +1,12 @@
 # DMOX Backlog
 
-Cập nhật: 2026-07-22
+Cập nhật: 2026-07-23
 
 Trạng thái nhanh:
 
 | # | Mục | Priority | Trạng thái |
 |---|-----|----------|------------|
-| 1 | Preserve UI state after reload | High | 🟡 Một phần — còn `activePanel` + scroll position |
+| 1 | Preserve UI state after reload | High | 🟢 Xong |
 | 2 | Improve docker-compose local mount | High | 🔴 Chưa làm |
 | 3 | Git integration | High | 🔴 Mới có history + blame. Pha A đã có plan; pha write tách story riêng |
 | 4 | Realtime sync local files | Critical | 🟢 Xong chiều Local → UI. Chiều UI → Local tách thành item riêng (cần editor) |
@@ -16,7 +16,7 @@ Trạng thái nhanh:
 ---
 
 ## 1. Preserve UI state after reload
-Priority: High — 🟡 **Một phần**
+Priority: High — 🟢 **Xong**
 
 ### Current issue
 Reload page làm mất context hiện tại:
@@ -39,29 +39,44 @@ Reload page làm mất context hiện tại:
 - Sidebar width + right-panel width persist.
 - Page hiện tại giữ nguyên sẵn nhờ routing (URL là source of truth).
 
-### Còn lại
+### Đã làm (đợt 2, 2026-07-23)
 
-**1a. Persist `activePanel`**
+**1a. Persist `activePanel`** (`web/src/useActivePanel.ts`)
 
-`activePanel` đang là `useState` thuần (`WorkspaceLayout.tsx`), reload là mất.
-Thêm key `dmox-panel-${workspaceId}`, dùng lại đúng pattern của
-`useFavorites` / `useExpandedFolders`.
+Panel đang mở được lưu theo workspace (`dmox-panel-${workspaceId}`) và mở lại
+khi load, đánh dấu sẵn là "đã opened" để pane lazy-mount render được ngay.
 
-> ⚠️ Restore `terminal` đồng nghĩa **spawn một PTY shell mỗi lần load trang**.
-> Đề xuất: chỉ auto-restore `search` / `ai-context`; `terminal` khôi phục ở
-> trạng thái đóng, hoặc mở panel nhưng chờ user chủ động bấm "Start".
+**Terminal cố tình không restore**: mở panel đó là spawn một PTY shell thật,
+restore nghĩa là mỗi lần load trang lại đẻ thêm một shell — kể cả những lần
+reload mà user không hề nghĩ là "mở terminal". Chuyển sang Terminal vẫn xoá
+giá trị đã lưu, để panel cũ không quay lại.
 
-**1b. Restore scroll position của `.content`**
+> Giá trị lưu được đọc trong lúc render, không đọc trong effect:
+> `WorkspaceLayout` không remount khi đổi workspace, nên effect sẽ ghi panel
+> của workspace cũ vào key của workspace mới rồi mới tự sửa lại.
 
-Lưu `scrollTop` (debounced) theo `workspaceId + path` vào `sessionStorage`.
-Khôi phục sau khi file load xong, thay cho `resetScroll()` hiện tại trong
-`FileViewerPage.tsx` — nhưng **chỉ khi là reload/back**; navigate sang file
-khác thì vẫn phải về đầu như hiện nay.
+**1b. Restore scroll position** (`web/src/scrollMemory.ts`)
 
-> ⚠️ Đụng trực tiếp lớp bug đã fix ngày 2026-07-22: Mermaid render async, nên
-> restore scroll trước khi diagram render xong sẽ rơi sai vị trí. Phải restore
-> **sau** khi diagram settle, hoặc re-apply một lần trong `requestAnimationFrame`
-> sau render. Xem "Ghi chú kỹ thuật" ở cuối file.
+Vị trí scroll lưu theo từng doc vào `sessionStorage`, khôi phục khi reload
+hoặc back/forward (`navigationType === 'POP'`); click vào một doc là đọc mới
+nên vẫn về đầu trang.
+
+Khôi phục phải là **vòng lặp retry**, không phải gán một lần, vì hai lý do:
+
+1. Chiều cao doc chưa chốt cho tới khi nội dung async render xong → gán sớm bị
+   clamp và rơi thiếu.
+2. `MermaidBlock` cố tình nudge `scrollTop` mỗi khi một diagram render xong —
+   đúng cho người đang đọc, nhưng **sai** khi đang restore, vì offset đã lưu
+   được đo trên layout hoàn chỉnh. Đo thực tế: không có vòng lặp thì vị trí
+   trôi từ 3200 lên 4994.
+
+Vòng lặp re-assert target cho tới khi chiều cao đứng yên, hết deadline, hoặc
+user bắt đầu scroll — không bao giờ giành scroll với user.
+
+Verify bằng Chromium thật trên doc có 5 diagram: lưu 3200 trong layout 6191px,
+reload rơi vào 4102 lúc đang render rồi settle đúng 3200; nút back khôi phục
+3200; click link vào doc thì bắt đầu ở 0. Mở terminal rồi reload: 0 websocket,
+panel đóng.
 
 ---
 
@@ -250,7 +265,7 @@ Về lâu dài, Favorites có thể mở rộng thành một khu vực Workspace
 
 Thứ tự đề xuất cho các mục còn lại:
 
-1. **#1 phần còn lại** — nhỏ, cùng pattern đã có, làm gọn trong một lượt.
+1. ~~#1 phần còn lại~~ — ✅ xong 2026-07-23.
 2. **#3 pha A (read-only git)** — giá trị lớn nhất cho người dùng, không đụng
    định vị sản phẩm.
 3. **#2 docker mount** — nền tảng cho việc người khác chạy được DMOX.
