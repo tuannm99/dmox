@@ -8,7 +8,7 @@ Trạng thái nhanh:
 |---|-----|----------|------------|
 | 1 | Preserve UI state after reload | High | 🟢 Xong |
 | 2 | Improve docker-compose local mount | High | 🔴 Chưa làm |
-| 3 | Git integration | High | 🔴 Mới có history + blame. Pha A đã có plan; pha write tách story riêng |
+| 3 | Git integration | High | 🟡 Pha A (read-only) xong. Pha write tách story riêng, chưa bắt đầu |
 | 4 | Realtime sync local files | Critical | 🟢 Xong chiều Local → UI. Chiều UI → Local tách thành item riêng (cần editor) |
 | 5 | Mermaid interaction UX | Medium | 🟢 Xong |
 | 6 | Favorites in Tree View | Medium | 🟢 Xong (2 mục hoãn có chủ đích) |
@@ -123,7 +123,7 @@ từng máy, không portable.
 ---
 
 ## 3. Git integration
-Priority: High — 🔴 **Mới có history + blame**
+Priority: High — 🟡 **Pha A xong** (2026-07-23)
 
 ### Current issue
 Git gần như chưa usable.
@@ -144,22 +144,42 @@ Thiếu:
 ### Expected
 Agent có thể sử dụng git như IDE.
 
-### Pha A — read-only (làm trước)
+### Pha A — read-only ✅ xong
 
-Khớp với định vị "read-only documentation browser" hiện tại, không mở bề mặt
-ghi nào.
+Không có bề mặt ghi nào; giữ nguyên định vị "read-only documentation browser".
 
-1. `internal/gitsvc`: thêm `Branch()`, `Status()`, `DiffWorkingTree()`.
-2. API: `GET /workspaces/:id/git/branch`, `/git/status`, `/git/diff`.
-3. Datasource: implement **cả hai** phía (`liveDataSource` + `staticDataSource`)
-   — static export chỉ cần snapshot tại thời điểm build, không có working tree.
-4. UI: badge `M` / `A` / `U` trên node trong TreeView, cộng một section
-   **Git Changes** ở sidebar — trùng luôn với hướng "Workspace evolution"
-   ở cuối file này.
+Đã làm:
+
+1. `internal/gitsvc/worktree.go`: `WorkingTree()` (branch + status từng file) và
+   `WorkingTreeDiff()` (on-disk vs HEAD).
+2. API: `GET /workspaces/:id/git/status`, `GET /workspaces/:id/git/working-diff`.
+   *Gộp branch vào `status`* thay vì tách `/git/branch` như plan ban đầu —
+   branch một mình không dùng được gì, gộp lại thì UI chỉ cần một request.
+3. Datasource: cả `liveDataSource` lẫn `staticDataSource` (static export không
+   có working tree nên luôn báo không có gì).
+4. UI: section **Git Changes** trên tree (branch, số lượng, mỗi doc một dòng,
+   cap chiều cao + scroll riêng như Favorites), badge `M`/`A`/`D`/`U` trên node,
+   và diff working-tree dùng lại `DiffModal` qua prop `kind`.
+
+Hai điều chỉnh phát hiện khi chạy thật, không phải khi đọc code:
+
+- **Cache bắt buộc**: `Status()` của go-git hash toàn bộ working tree, đo được
+  **~2s** trên repo cỡ vừa. Kết quả được cache theo thư mục và **xoá ngay khi
+  watcher báo có thay đổi** trong source đó. TTL 10s là lưới đỡ cho những gì
+  watcher không thấy — chủ yếu là `git checkout` đổi branch, vì việc đó xảy ra
+  bên trong `.git`.
+- **Lọc theo file DMOX index**: source root chứa nhiều thứ ngoài docs. Ban đầu
+  danh sách hiện cả `serve.go`, `config.yaml` — không có node tương ứng trong
+  tree, click vào là 404.
 
 > ⚠️ Chỉ có nghĩa với source `type: local` trỏ vào working dir thật. Source
-> `type: git` là **mirrored clone**, không có working tree → phải xử lý riêng,
-> không dùng chung code path được. API phải trả rõ "not applicable" thay vì lỗi.
+> `type: git` là **mirrored clone**, không có working tree. API trả
+> `applicable: false` thay vì lỗi.
+>
+> ⚠️ **Hệ quả với Docker**: nếu chỉ mount `docs/` (không mount cả repo), bên
+> trong container không có `.git` để đi ngược lên → `applicable: false`, section
+> Git Changes tự ẩn. Muốn dùng được thì phải mount repo root (hoặc ít nhất
+> `.git`). Ràng buộc này nên gộp vào **mục 2** khi làm lại phần mount.
 
 ### Pha B — write (stage/commit/checkout/pull/push)
 
@@ -266,9 +286,9 @@ Về lâu dài, Favorites có thể mở rộng thành một khu vực Workspace
 Thứ tự đề xuất cho các mục còn lại:
 
 1. ~~#1 phần còn lại~~ — ✅ xong 2026-07-23.
-2. **#3 pha A (read-only git)** — giá trị lớn nhất cho người dùng, không đụng
-   định vị sản phẩm.
-3. **#2 docker mount** — nền tảng cho việc người khác chạy được DMOX.
+2. ~~#3 pha A (read-only git)~~ — ✅ xong 2026-07-23.
+3. **#2 docker mount** — nền tảng cho việc người khác chạy được DMOX. Giờ còn
+   thêm lý do: không mount cả repo thì Git Changes không dùng được.
 4. **#3 pha B** — chỉ sau khi có story + brainstorm riêng.
 
 > Nếu roadmap business (self-host per company) sắp tới gần thì **#2 phải nhảy
