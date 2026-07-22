@@ -53,4 +53,30 @@ describe('MarkdownView', () => {
     const link = screen.getByRole('link', { name: 'Jump' });
     expect(link).toHaveAttribute('href', '#overview');
   });
+
+  // Regression: the components map used to be rebuilt inline on every render,
+  // giving react-markdown fresh component types and making React remount the
+  // whole document. That re-ran MermaidBlock's async render, briefly emptying
+  // the diagram — which collapses the scroll container's height and yanks the
+  // reader back to the top on any re-render (e.g. the scroll-to-top button's
+  // 300px threshold flipping mid-scroll).
+  it('does not remount the document subtree when the parent re-renders', async () => {
+    const mermaid = (await import('mermaid')).default;
+    const { container, rerender } = renderMarkdown('```mermaid\ngraph TD; A-->B;\n```');
+    await screen.findAllByTestId('mermaid-svg');
+    const renderCalls = (mermaid.render as ReturnType<typeof vi.fn>).mock.calls.length;
+    const diagramBefore = container.querySelector('.mermaid-diagram');
+
+    rerender(
+      <MemoryRouter>
+        <MarkdownView body={'```mermaid\ngraph TD; A-->B;\n```'} workspaceId="ws" currentPath="local/services/auth/db-design.md" />
+      </MemoryRouter>
+    );
+
+    expect((mermaid.render as ReturnType<typeof vi.fn>).mock.calls.length).toBe(renderCalls);
+    // Same DOM node, still holding its rendered svg — a remount would have
+    // replaced it with an empty one.
+    expect(container.querySelector('.mermaid-diagram')).toBe(diagramBefore);
+    expect(diagramBefore?.querySelector('svg')).not.toBeNull();
+  });
 });
