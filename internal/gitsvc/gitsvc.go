@@ -3,6 +3,7 @@ package gitsvc
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -26,9 +27,12 @@ type BlameLine struct {
 	Text   string    `json:"text"`
 }
 
-type Service struct{}
+type Service struct {
+	mu sync.Mutex
+	wt map[string]*wtEntry // working-tree status cache, see worktree.go
+}
 
-func New() *Service { return &Service{} }
+func New() *Service { return &Service{wt: make(map[string]*wtEntry)} }
 
 func (s *Service) History(mirrorDir, path string, limit int) ([]Commit, error) {
 	repo, err := git.PlainOpen(mirrorDir)

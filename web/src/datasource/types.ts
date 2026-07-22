@@ -72,6 +72,28 @@ export interface FileDiff {
   new?: string;
 }
 
+export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed' | 'copied' | 'conflicted';
+
+export interface GitFileEntry {
+  /** Relative to the source root, matching the doc tree's paths. */
+  path: string;
+  status: GitFileStatus;
+  staged: boolean;
+}
+
+export interface GitSourceStatus {
+  /** False when the source isn't inside a git checkout — an ordinary state,
+   *  e.g. a docs/ directory mounted on its own without the surrounding repo. */
+  applicable: boolean;
+  branch: string;
+  detached: boolean;
+  files: GitFileEntry[];
+}
+
+export interface GitStatus {
+  sources: Record<string, GitSourceStatus>;
+}
+
 export interface DataSource {
   listWorkspaces(): Promise<Workspace[]>;
   getTree(workspaceId: string): Promise<TreeNode>;
@@ -80,6 +102,8 @@ export interface DataSource {
   getAIContext(workspaceId: string): Promise<AIContextEntry[]>;
   getGitHistory(workspaceId: string, path: string): Promise<GitHistoryResult>;
   getGitBlame(workspaceId: string, path: string): Promise<GitBlameResult>;
+  getGitStatus(workspaceId: string): Promise<GitStatus>;
+  getGitWorkingDiff(workspaceId: string, path: string): Promise<FileDiff>;
   subscribeToChanges(workspaceId: string, onEvent: (ev: ChangeEvent) => void, onResync: () => void): () => void;
   getFileDiff(workspaceId: string, sourceId: string, path: string): Promise<FileDiff>;
 }

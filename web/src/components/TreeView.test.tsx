@@ -122,4 +122,31 @@ describe('findNodeByPath', () => {
   it('returns undefined for a path that no longer exists', () => {
     expect(findNodeByPath(tree, 'local/missing.md')).toBeUndefined();
   });
+
+  it('badges a file with its git working-tree status, leaving unchanged files bare', () => {
+    const tree = {
+      name: 'WS', path: '', is_dir: true,
+      children: [
+        {
+          name: 'local', path: 'local', is_dir: true,
+          children: [
+            { name: 'changed.md', path: 'local/changed.md', is_dir: false },
+            { name: 'clean.md', path: 'local/clean.md', is_dir: false },
+          ],
+        },
+      ],
+    };
+    const gitStatus = (path: string) => (path === 'local/changed.md' ? 'modified' : undefined);
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" gitStatus={gitStatus} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'local' }));
+
+    const badge = screen.getByTitle('modified');
+    expect(badge).toHaveTextContent('M');
+    expect(screen.getByRole('link', { name: /changed\.md/ }).parentElement).toContainElement(badge);
+    expect(screen.queryByTitle('untracked')).not.toBeInTheDocument();
+  });
 });

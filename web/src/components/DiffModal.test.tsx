@@ -44,4 +44,25 @@ describe('DiffModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /close diff/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('diffs against the committed version when asked for a working-tree diff', async () => {
+    const getGitWorkingDiff = vi.fn().mockResolvedValue({ available: true, old: 'committed\n', new: 'edited\n' });
+    (globalThis as any).__testDataSource = { getFileDiff: vi.fn(), getGitWorkingDiff };
+
+    render(<DiffModal workspaceId="ws" sourceId="local" path="sub/a.md" kind="working-tree" onClose={() => {}} />);
+
+    await waitFor(() => expect(getGitWorkingDiff).toHaveBeenCalledWith('ws', 'local/sub/a.md'));
+    expect((globalThis as any).__testDataSource.getFileDiff).not.toHaveBeenCalled();
+    expect(await screen.findByText(/committed/)).toBeInTheDocument();
+    expect(screen.getByText(/edited/)).toBeInTheDocument();
+  });
+
+  it('says the source is not in a checkout when a working-tree diff is unavailable', async () => {
+    (globalThis as any).__testDataSource = {
+      getFileDiff: vi.fn(),
+      getGitWorkingDiff: vi.fn().mockResolvedValue({ available: false }),
+    };
+    render(<DiffModal workspaceId="ws" sourceId="local" path="a.md" kind="working-tree" onClose={() => {}} />);
+    expect(await screen.findByText('Not inside a git checkout.')).toBeInTheDocument();
+  });
 });

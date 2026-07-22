@@ -13,11 +13,16 @@ export function DiffModal({
   workspaceId,
   sourceId,
   path,
+  kind = 'live-change',
   onClose,
 }: {
   workspaceId: string;
   sourceId: string;
   path: string;
+  /** 'live-change' diffs against the previously indexed content (what the
+   *  file watcher just replaced); 'working-tree' diffs against the committed
+   *  version in git. Same shape, same rendering, different question. */
+  kind?: 'live-change' | 'working-tree';
   onClose: () => void;
 }) {
   const ds = useDataSource();
@@ -26,13 +31,17 @@ export function DiffModal({
   useEffect(() => {
     let cancelled = false;
     setDiff(null);
-    ds.getFileDiff(workspaceId, sourceId, path).then((d) => {
+    const request =
+      kind === 'working-tree'
+        ? ds.getGitWorkingDiff(workspaceId, `${sourceId}/${path}`)
+        : ds.getFileDiff(workspaceId, sourceId, path);
+    request.then((d) => {
       if (!cancelled) setDiff(d);
     });
     return () => {
       cancelled = true;
     };
-  }, [ds, workspaceId, sourceId, path]);
+  }, [ds, workspaceId, sourceId, path, kind]);
 
   return (
     <div className="diff-modal-overlay" onClick={onClose}>
@@ -44,7 +53,11 @@ export function DiffModal({
           </button>
         </div>
         {diff === null && <div className="loading">Loading…</div>}
-        {diff !== null && !diff.available && <p className="diff-unavailable">No previous version to compare.</p>}
+        {diff !== null && !diff.available && (
+          <p className="diff-unavailable">
+            {kind === 'working-tree' ? 'Not inside a git checkout.' : 'No previous version to compare.'}
+          </p>
+        )}
         {diff !== null && diff.available && diff.old === diff.new && <p className="diff-unavailable">No changes.</p>}
         {diff !== null && diff.available && diff.old !== diff.new && (
           <pre className="diff-body">

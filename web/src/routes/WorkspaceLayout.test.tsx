@@ -74,7 +74,12 @@ vi.mock('../datasource/context', async () => {
       const base = (globalThis as any).__testDataSource;
       if (base !== cachedBase) {
         cachedBase = base;
-        cachedMerged = { subscribeToChanges: () => () => {}, ...base };
+        cachedMerged = {
+          subscribeToChanges: () => () => {},
+          getGitStatus: async () => ({ sources: {} }),
+          getGitWorkingDiff: async () => ({ available: false }),
+          ...base,
+        };
       }
       return cachedMerged;
     },

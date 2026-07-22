@@ -51,6 +51,13 @@ func runServe(cfg *config.Config) error {
 
 func watchAndReindex(ctx context.Context, a *app.App, wsID string, src source.Source, events <-chan source.ChangeEvent) {
 	for ev := range events {
+		// The git working-tree status is expensive enough to be cached, so
+		// tell it the source changed rather than letting it go stale until
+		// its TTL expires.
+		if local, ok := src.(*source.LocalSource); ok {
+			a.Git.InvalidateWorkingTree(local.Root())
+		}
+
 		oldBody, hadOld, err := a.Store.GetFileBody(ctx, wsID, src.ID(), ev.Path)
 		if err != nil {
 			log.Printf("watch %s/%s/%s: read previous content failed: %v", wsID, src.ID(), ev.Path, err)

@@ -37,7 +37,10 @@ type Source interface {
 	SupportsGit() bool
 }
 
-func isDocFile(name string) bool {
+// IsDocFile reports whether a filename is one DMOX indexes. Exported because
+// the API layer needs the same rule when filtering git status down to files
+// that actually exist in the doc tree.
+func IsDocFile(name string) bool {
 	ext := extLower(name)
 	return ext == ".md" || ext == ".markdown"
 }

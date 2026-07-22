@@ -1,6 +1,6 @@
 import type {
   DataSource, TreeNode, FileView, SearchResult, AIContextEntry, Workspace,
-  GitHistoryResult, GitBlameResult, ChangeEvent, FileDiff,
+  GitHistoryResult, GitBlameResult, ChangeEvent, FileDiff, GitStatus,
 } from './types';
 
 async function getJSON<T>(url: string): Promise<T> {
@@ -36,6 +36,9 @@ export function createLiveDataSource(baseURL = ''): DataSource {
       getJSON<GitHistoryResult>(`${baseURL}/api/workspaces/${workspaceId}/git/history?path=${encodeURIComponent(path)}`),
     getGitBlame: (workspaceId, path) =>
       getJSON<GitBlameResult>(`${baseURL}/api/workspaces/${workspaceId}/git/blame?path=${encodeURIComponent(path)}`),
+    getGitStatus: (workspaceId) => getJSON<GitStatus>(`${baseURL}/api/workspaces/${workspaceId}/git/status`),
+    getGitWorkingDiff: (workspaceId, path) =>
+      getJSON<FileDiff>(`${baseURL}/api/workspaces/${workspaceId}/git/working-diff?path=${encodeURIComponent(path)}`),
     subscribeToChanges: (workspaceId, onEvent, onResync) => {
       const es = new EventSource(`${baseURL}/api/workspaces/${workspaceId}/events`);
       let opened = false;

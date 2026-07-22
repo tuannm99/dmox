@@ -49,7 +49,7 @@ func (s *LocalSource) List(ctx context.Context) ([]FileInfo, error) {
 			}
 			return nil
 		}
-		if !isDocFile(d.Name()) {
+		if !IsDocFile(d.Name()) {
 			return nil
 		}
 		info, err := d.Info()

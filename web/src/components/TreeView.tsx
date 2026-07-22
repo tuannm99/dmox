@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { TreeNode } from '../datasource/types';
+import { statusLetter } from '../useGitStatus';
 
 function sortedChildren(node: TreeNode): TreeNode[] {
   return [...(node.children ?? [])].sort((a, b) => {
@@ -65,6 +66,22 @@ export interface TreeExpandProps {
   onToggleExpanded?: (path: string) => void;
 }
 
+export interface TreeGitProps {
+  /** Working-tree status for a path, or undefined when it is unchanged (or
+   *  the source isn't in a git checkout at all). */
+  gitStatus?: (path: string) => string | undefined;
+}
+
+function GitBadge({ node, gitStatus }: { node: TreeNode } & TreeGitProps) {
+  const status = gitStatus?.(node.path);
+  if (!status) return null;
+  return (
+    <span className={`git-status-badge git-status-${status}`} title={status}>
+      {statusLetter(status)}
+    </span>
+  );
+}
+
 export function TreeView({
   node,
   workspaceId,
@@ -73,12 +90,14 @@ export function TreeView({
   onToggleFavorite,
   isExpanded,
   onToggleExpanded,
+  gitStatus,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
 } & TreeFavoriteProps &
-  TreeExpandProps) {
+  TreeExpandProps &
+  TreeGitProps) {
   return (
     <ul className="tree">
       {sortedChildren(node).map((child) => (
@@ -91,6 +110,7 @@ export function TreeView({
           onToggleFavorite={onToggleFavorite}
           isExpanded={isExpanded}
           onToggleExpanded={onToggleExpanded}
+          gitStatus={gitStatus}
         />
       ))}
     </ul>
@@ -105,12 +125,14 @@ function TreeNodeItem({
   onToggleFavorite,
   isExpanded,
   onToggleExpanded,
+  gitStatus,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
 } & TreeFavoriteProps &
-  TreeExpandProps) {
+  TreeExpandProps &
+  TreeGitProps) {
   // Uncontrolled fallback (no isExpanded/onToggleExpanded passed) still
   // defaults to collapsed, matching the controlled default — nothing about
   // "not persisted" should mean "open by default".
@@ -151,6 +173,7 @@ function TreeNodeItem({
                 onToggleFavorite={onToggleFavorite}
                 isExpanded={isExpanded}
                 onToggleExpanded={onToggleExpanded}
+                gitStatus={gitStatus}
               />
             ))}
           </ul>
@@ -168,6 +191,7 @@ function TreeNodeItem({
           </span>
           {node.name}
         </Link>
+        <GitBadge node={node} gitStatus={gitStatus} />
         <FavoriteToggle node={node} isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />
       </div>
     </li>

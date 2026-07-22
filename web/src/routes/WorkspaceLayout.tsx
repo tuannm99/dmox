@@ -14,6 +14,8 @@ import { FavoritesSection } from '../components/FavoritesSection';
 import { useFavorites } from '../useFavorites';
 import { useExpandedFolders } from '../useExpandedFolders';
 import { useActivePanel } from '../useActivePanel';
+import { useGitStatus } from '../useGitStatus';
+import { GitChangesSection } from '../components/GitChangesSection';
 
 export interface WorkspaceOutletContext {
   tree: TreeNode;
@@ -57,7 +59,10 @@ export function WorkspaceLayout() {
   const { activePanel, openedPanels, setActivePanel, togglePanel } = useActivePanel(workspaceId);
   const [keymap, setKeymap] = useState<Keymap>(defaultKeymap);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string } | null>(null);
+  const [diffTarget, setDiffTarget] = useState<{ sourceId: string; path: string; kind: 'live-change' | 'working-tree' } | null>(null);
+  // Bumped on every watcher event so the git status refetches; the backend
+  // drops its (expensive) cached scan on the same events.
+  const [changeTick, setChangeTick] = useState(0);
   const [fileChangeEvent, setFileChangeEvent] = useState<ChangeEvent | null>(null);
   const { favorites, toggleFavorite, isFavorite } = useFavorites(workspaceId);
   const { isExpanded, toggleExpanded, expandAncestors } = useExpandedFolders(workspaceId);
@@ -69,6 +74,8 @@ export function WorkspaceLayout() {
   const treeRefetchTimer = useRef<ReturnType<typeof setTimeout>>();
   const toastIdRef = useRef(0);
   const location = useLocation();
+  const gitStatus = useGitStatus(workspaceId, changeTick);
+  const statusOfPath = useCallback((path: string) => gitStatus.byPath.get(path)?.status, [gitStatus]);
   const docPrefix = `/w/${workspaceId}/doc/`;
   const currentPath = location.pathname.startsWith(docPrefix) ? location.pathname.slice(docPrefix.length) : undefined;
 
@@ -119,6 +126,7 @@ export function WorkspaceLayout() {
 
     function handleEvent(ev: ChangeEvent) {
       scheduleTreeRefetch();
+      setChangeTick((t) => t + 1);
       toastIdRef.current += 1;
       setToasts((prev) => [...prev, { id: String(toastIdRef.current), sourceId: ev.sourceId, path: ev.path, op: ev.op }]);
       if (currentPathRef.current === `${ev.sourceId}/${ev.path}`) {
@@ -144,7 +152,11 @@ export function WorkspaceLayout() {
   }, []);
 
   const viewDiff = useCallback((item: ToastItem) => {
-    setDiffTarget({ sourceId: item.sourceId, path: item.path });
+    setDiffTarget({ sourceId: item.sourceId, path: item.path, kind: 'live-change' });
+  }, []);
+
+  const viewWorkingDiff = useCallback((sourceId: string, path: string) => {
+    setDiffTarget({ sourceId, path, kind: 'working-tree' });
   }, []);
 
   const handleResizeMouseDown = useCallback(
@@ -262,6 +274,7 @@ export function WorkspaceLayout() {
             isExpanded={isExpanded}
             onToggleExpanded={toggleExpanded}
           />
+          <GitChangesSection workspaceId={workspaceId} status={gitStatus} onViewDiff={viewWorkingDiff} />
           <div className="sidebar-tree" ref={sidebarTreeRef}>
             <TreeView
               node={tree}
@@ -271,6 +284,7 @@ export function WorkspaceLayout() {
               onToggleFavorite={toggleFavorite}
               isExpanded={isExpanded}
               onToggleExpanded={toggleExpanded}
+              gitStatus={statusOfPath}
             />
           </div>
         </nav>
@@ -314,6 +328,7 @@ export function WorkspaceLayout() {
             workspaceId={workspaceId}
             sourceId={diffTarget.sourceId}
             path={diffTarget.path}
+            kind={diffTarget.kind}
             onClose={() => setDiffTarget(null)}
           />
         )}
