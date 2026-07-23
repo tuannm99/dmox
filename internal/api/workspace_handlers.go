@@ -12,8 +12,6 @@ import (
 	"github.com/tuannm99/dmox/internal/source"
 )
 
-const maxHighlightBytes = 1 << 20 // 1 MiB — above this, serve raw, don't highlight
-
 func handleListWorkspaces(a *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		out := make([]gin.H, 0, len(a.Cfg.Workspaces))
@@ -64,9 +62,13 @@ func handleFile(a *app.App) gin.HandlerFunc {
 			return
 		}
 		base := filepath.Base(relPath)
-		if source.Classify(base) != source.ClassDoc {
+		switch source.Classify(base) {
+		case source.ClassText:
 			c.JSON(http.StatusOK, render.CodeFileView(
-				path, raw, source.HighlightLanguage(base), maxHighlightBytes))
+				path, raw, source.HighlightLanguage(base), render.MaxHighlightBytes))
+			return
+		case source.ClassUnsupported:
+			c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
 			return
 		}
 		doc := index.Parse(raw, base)

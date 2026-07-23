@@ -76,7 +76,7 @@ func Build(ctx context.Context, a *app.App, opts Options) error {
 			return fmt.Errorf("build: read %s: %w", path, err)
 		}
 		if !source.IsIndexed(relPath) {
-			fv := render.CodeFileView(path, raw, source.HighlightLanguage(filepath.Base(relPath)), 1<<20)
+			fv := render.CodeFileView(path, raw, source.HighlightLanguage(filepath.Base(relPath)), render.MaxHighlightBytes)
 			if err := writeJSON(filepath.Join(opts.OutDir, "data", "files", path+".json"), fv); err != nil {
 				return fmt.Errorf("build: write file json %s: %w", path, err)
 			}

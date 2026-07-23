@@ -5,6 +5,12 @@ import (
 	"regexp"
 )
 
+// MaxHighlightBytes is the size cutoff above which a code file is served raw
+// (no syntax highlighting) rather than paying highlight.js's cost on a huge
+// file. Shared by the live API (internal/api) and the static build
+// (internal/staticbuild) so the two paths can't drift apart.
+const MaxHighlightBytes = 1 << 20 // 1 MiB
+
 type FileView struct {
 	Path                string         `json:"path"`
 	Title               string         `json:"title"`
