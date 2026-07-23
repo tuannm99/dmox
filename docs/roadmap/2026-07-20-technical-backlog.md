@@ -12,6 +12,18 @@ Trạng thái nhanh:
 | 4 | Realtime sync local files | Critical | 🟢 Xong chiều Local → UI. Chiều UI → Local tách thành item riêng (cần editor) |
 | 5 | Mermaid interaction UX | Medium | 🟢 Xong |
 | 6 | Favorites in Tree View | Medium | 🟢 Xong (2 mục hoãn có chủ đích) |
+| 7 | General File Viewer | High | 🔴 Chưa làm — nền tảng cho #9 |
+| 8 | Tách Git Explorer khỏi File Explorer | High | 🔴 Chưa làm — redesign chỗ #3 pha A vừa đặt vào tree |
+| 9 | Editor Tab Bar | High | 🔴 Chưa làm — cần #7 trước |
+| 10 | Tách Favorites thành view riêng | Medium | 🔴 Chưa làm — redesign chỗ #6 vừa đặt vào tree |
+
+> **#7–#10 là một cụm "DMOX → Documentation Workspace".** #7 mở phạm vi từ
+> README viewer thành trình duyệt mọi file; #9 (tab bar) gần như bắt buộc ngay
+> sau #7. #8 và #10 là cùng một việc: tách sidebar thành các view độc lập kiểu
+> VS Code (Explorer / Favorites / Source Control / …), và **cố tình dời ra khỏi
+> Tree View những thứ mà #3 pha A và #6 vừa nhét vào đó** — coi phần Git Changes
+> + Favorites hiện nằm trong sidebar là bản tạm, đúng để giao nhanh, sai về lâu
+> dài. Thứ tự triển khai ở [Priority order](#priority-order).
 
 ---
 
@@ -254,6 +266,181 @@ Hai mục này chỉ đáng làm khi số lượng favorite thực sự lớn; h
 
 ---
 
+## 7. General File Viewer
+Priority: High — 🔴 **Chưa làm**
+
+### Current issue
+DMOX hiện xoay quanh việc đọc `README.md` (và các doc file được index), chưa mở
+và duyệt được các loại file khác trong repository.
+
+### Expected
+Mở và xem trực tiếp nhiều loại file thay vì chỉ doc — đây là bước biến DMOX từ
+**README Viewer** thành **Repository Documentation Browser**.
+
+### Supported file types
+- **Documentation**: Markdown (`.md`, `.mdx`), plain text (`.txt`),
+  reStructuredText (`.rst`), AsciiDoc (`.adoc`).
+- **Source code**: Go, Rust, TypeScript, JavaScript, Python, Java, C/C++, YAML,
+  JSON, TOML, XML, SQL, Shell.
+- **Config**: Dockerfile, docker-compose.yml, Makefile, Jenkinsfile, GitHub
+  Actions, GitLab CI.
+- **Diagram**: Mermaid, PlantUML.
+
+### Features
+- Syntax highlight, line number, copy code.
+- Search trong file.
+- Dark/Light theme, read-only mode.
+- *Future*: mini map, collapse/fold code.
+
+### Navigation
+- Click file trong Tree View để mở.
+- Breadcrumb, Back/Forward.
+- Nhiều tab (→ **#9**, tách riêng vì là hệ thống riêng).
+
+### Acceptance criteria
+- Mở được mọi file text phổ biến, tự nhận diện ngôn ngữ.
+- Render Markdown đầy đủ, render Mermaid/PlantUML inline.
+- Không crash với file lớn.
+
+### Ghi chú triển khai (chưa code — cần khảo sát trước)
+- **Đụng thẳng vào định vị "read-only documentation browser"** ở `CLAUDE.md`:
+  read-only thì vẫn giữ, nhưng "documentation" mở rộng thành "mọi file". Cần
+  chốt: index/tree có liệt kê cả file non-doc không, hay chỉ mở on-demand khi
+  click? (`source.IsDocFile` hiện đang lọc — xem đúng chỗ #3 pha A vấp phải khi
+  Git Changes hiện cả `serve.go`.)
+- **File lớn**: "không crash" cần ngưỡng cụ thể — cap kích thước render, virtualize
+  theo dòng, hay stream. Đo trước, đừng đoán.
+- **Hai datasource**: mọi UI đọc dữ liệu mới đều phải làm cả `liveDataSource`
+  lẫn `staticDataSource`. Static export hiện chỉ ghi doc đã render — muốn xem
+  source file thì export phải mang theo raw content.
+
+---
+
+## 8. Tách Git Explorer khỏi File Explorer
+Priority: High — 🔴 **Chưa làm**
+
+### Current issue
+Git Changes/Diff đang nằm chung trong Tree View (chính là chỗ #3 pha A đặt vào).
+Trộn cấu trúc thư mục với trạng thái Git làm sidebar rối khi repo lớn, và sai
+vai trò của File Explorer.
+
+### Expected
+Sidebar tách theo view độc lập kiểu VS Code, mỗi view một trách nhiệm:
+- Explorer — cấu trúc repository.
+- Favorites (→ **#10**).
+- Source Control — Git Changes, Diff, (write ở **#3 pha B**).
+- *Future*: Search, AI Context, Terminal.
+
+### Git View hiển thị
+- Changed Files, Staged Changes, Untracked Files.
+- *Future*: Merge Conflicts.
+
+### Features
+- Click file để xem diff, branch hiện tại, refresh.
+- *Cần #3 pha B*: Stage/Unstage, Discard, Commit, Incoming/Outgoing.
+
+### UX
+- Tree View **chỉ** hiển thị cấu trúc repository.
+- Git View **chỉ** hiển thị trạng thái Git.
+- Chuyển view bằng icon trên sidebar (activity bar) kiểu VS Code.
+
+### Acceptance criteria
+- Explorer luôn sạch, chỉ folder/file.
+- Git Explorer hiển thị đầy đủ trạng thái Git.
+- Chuyển nhanh giữa Explorer và Git View.
+
+### Quan hệ với việc đã làm
+Đây là hướng UX đúng, và nó **redesign** phần `GitChangesSection` mà #3 pha A
+vừa gắn lên đầu tree. Coi section đó là bản tạm. Phần read-only (status API,
+diff, badge) tái sử dụng nguyên; chỉ chuyển chỗ hiển thị từ "một section trong
+tree" sang "một view riêng trong activity bar". Việc này nên đi **cùng #10**
+vì cả hai đều là "dựng activity bar + tách view" — làm hạ tầng đó một lần.
+
+---
+
+## 9. Editor Tab Bar
+Priority: High — 🔴 **Chưa làm** — cần **#7** trước
+
+### Current issue
+Muốn xem nhiều file phải đóng file đang xem hoặc mở tab trình duyệt mới — gián
+đoạn việc đọc và so sánh.
+
+### Expected
+Tab bar kiểu VS Code phía trên vùng nội dung, quản lý các file đang mở.
+
+### Features
+- Mỗi file mở một tab; chuyển nhanh; đóng từng tab / đóng khác / đóng tất cả.
+- *Future*: pin tab, drag & drop sắp xếp.
+
+### Tab state (mỗi tab lưu)
+- File path, scroll position, collapse state của Markdown.
+- *Future*: cursor/anchor (khi có editor), diagram zoom/pan.
+
+### Persistence
+Sau reload: khôi phục danh sách tab, tab active, và scroll của từng tab.
+
+### Navigation
+- Double click file trong tree → mở tab mới; click file đã mở → chuyển tab, **không
+  tạo duplicate**.
+- Breadcrumb đồng bộ với tab active.
+
+### UX
+- Tab bar trên cùng, icon theo loại file, *future*: badge modified.
+- Context menu: Close / Close Others / Close All / Copy Path / Reveal in Explorer.
+
+### Acceptance criteria
+- Mở đồng thời nhiều file, không duplicate tab.
+- Reload giữ nguyên session.
+- Chuyển tab không mất trạng thái đọc.
+
+### Ghi chú triển khai
+- **Dùng lại hạ tầng đã có, đừng dựng song song**: scroll-per-doc đã có ở
+  `scrollMemory.ts` (#1b), panel/expand persist theo workspace đã có pattern
+  (`useActivePanel`, `useExpandedFolders`). Tab state chỉ là mở rộng: từ "một
+  doc active" thành "một danh sách doc + một active".
+- **URL vs tab list**: hiện URL là source of truth cho file đang mở (#1). Tab
+  bar cần một danh sách tab tách khỏi URL nhưng vẫn đồng bộ với nó — chốt cái
+  này trước khi code, nếu không back/forward và tab sẽ đá nhau.
+
+---
+
+## 10. Tách Favorites thành view riêng
+Priority: Medium — 🔴 **Chưa làm**
+
+### Current issue
+Favorites đang hiển thị ngay trong Tree View (chỗ #6 đặt vào) — trộn shortcut
+với cấu trúc repo, rối khi repo lớn, sai vai trò File Explorer.
+
+### Expected
+Favorites thành một view riêng trên sidebar, cùng bộ với #8:
+Explorer / **Favorites** / Source Control / *(future)* Search / AI Context / Terminal.
+
+### Favorites View hiển thị
+- Favorite Files, Favorite Folders (group theo loại).
+
+### Features
+- Add/Remove, Reveal in Explorer, Open in New Tab (→ **#9**), Remove Missing Items.
+- Search trong Favorites, drag & drop sắp thứ tự — **chính hai mục #6 đã hoãn có
+  chủ đích**; chỉ đáng làm khi Favorites tách view và số lượng đủ lớn.
+
+### Persistence
+Theo workspace, không commit vào Git (đã có: `localStorage: dmox-favorites-${workspaceId}`,
+`useFavorites.ts`), khôi phục sau reload.
+
+### UX
+- Chuyển bằng icon sidebar; Explorer chỉ cấu trúc repo, Favorites chỉ shortcut.
+- *Optional*: badge số lượng.
+
+### Acceptance criteria
+- Explorer không chứa Favorites; Favorites là view độc lập.
+- Chuyển nhanh Explorer ↔ Favorites; click favorite mở đúng file/folder.
+
+### Quan hệ với việc đã làm
+Giống #8: **redesign** chỗ #6 vừa gắn vào tree, tái sử dụng nguyên `useFavorites`
++ toggle, chỉ đổi chỗ hiển thị. Nên làm **cùng #8** trên cùng một activity bar.
+
+---
+
 ## Future enhancements
 
 - **Inline editing** (tách từ mục 4 — điều kiện cần cho chiều UI → Local).
@@ -267,17 +454,30 @@ Hai mục này chỉ đáng làm khi số lượng favorite thực sự lớn; h
 - File cache.
 - Ignore theo .gitignore.
 
-### Workspace evolution (sau Favorites)
+### Workspace evolution (đã hình thành thành #7–#10)
 
-Về lâu dài, Favorites có thể mở rộng thành một khu vực Workspace đầy đủ
-(tương tự VS Code), giảm nhu cầu mở tree khi làm việc với repo lớn:
+Hướng "DMOX → Documentation Workspace" trước đây ghi ở đây giờ đã cụ thể hoá
+thành **#7–#10**. Đường tiến hoá:
 
-- Favorites
-- Recent Files
-- Pinned Files
-- Open Editors
-- Working Set
-- Git Changes ← mục 3 pha A đóng góp trực tiếp phần này
+```
+README Viewer
+      ↓  #7 General File Viewer
+General File Viewer
+      ↓  #9 Editor Tab Bar
+Multi-tab Document Workspace
+      ↓  #8/#10 tách view (activity bar kiểu VS Code)
+Knowledge IDE
+      ↓
+AI Documentation Platform
+```
+
+Sidebar đích (mỗi view một trách nhiệm): 📁 Explorer · ⭐ Favorites ·
+🌿 Source Control · 🔍 Search *(future)* · 🤖 AI Context *(future)* ·
+💻 Terminal *(future)*.
+
+Nền tảng cho các bước xa hơn — mỗi cái là story + brainstorm riêng khi tới lúc:
+inline edit (sau realtime sync), AI Explain Selection, Go to Definition / Symbol,
+cross-file reference, global search toàn repo.
 
 ---
 
@@ -289,10 +489,17 @@ Thứ tự đề xuất cho các mục còn lại:
 2. ~~#3 pha A (read-only git)~~ — ✅ xong 2026-07-23.
 3. **#2 docker mount** — nền tảng cho việc người khác chạy được DMOX. Giờ còn
    thêm lý do: không mount cả repo thì Git Changes không dùng được.
-4. **#3 pha B** — chỉ sau khi có story + brainstorm riêng.
+4. **#7 General File Viewer** — mở phạm vi sản phẩm; là điều kiện cần của #9.
+5. **#9 Editor Tab Bar** — ngay sau #7, cùng nhau mới thành "workspace".
+6. **#8 + #10 cùng một đợt** — dựng activity bar tách view một lần, rồi dời Git
+   Changes và Favorites ra khỏi tree. Làm sau #7/#9 vì Open-in-New-Tab của cả
+   hai view đều trỏ vào tab bar.
+7. **#3 pha B** — chỉ sau khi có story + brainstorm riêng.
 
 > Nếu roadmap business (self-host per company) sắp tới gần thì **#2 phải nhảy
-> lên đầu**: đó là thứ khách hàng chạm vào đầu tiên, trước cả tính năng.
+> lên đầu**: đó là thứ khách hàng chạm vào đầu tiên, trước cả tính năng. #7–#10
+> là hướng "IDE cho docs" — mạnh về trải nghiệm nhưng không phải thứ khách chạm
+> đầu tiên, nên đứng sau #2.
 
 ---
 
