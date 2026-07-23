@@ -182,3 +182,10 @@ func extLower(name string) string {
 	}
 	return string(out)
 }
+
+func baseName(name string) string {
+	if i := strings.LastIndexAny(name, "/\\"); i >= 0 {
+		return name[i+1:]
+	}
+	return name
+}
