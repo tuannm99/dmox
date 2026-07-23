@@ -122,10 +122,11 @@ func handleGitStatus(a *app.App) gin.HandlerFunc {
 			// A source root usually holds far more than docs (code, configs,
 			// dotfiles). Reporting those would put entries in the sidebar that
 			// have no corresponding node in the doc tree, so nothing to badge
-			// and nothing to open.
+			// and nothing to open. Keep only files that have a node in the tree
+			// (docs + viewable code/config).
 			docs := make([]gitsvc.FileStatus, 0, len(st.Files))
 			for _, f := range st.Files {
-				if source.IsDocFile(f.Path) {
+				if source.IsViewable(f.Path) {
 					docs = append(docs, f)
 				}
 			}

@@ -1,6 +1,11 @@
 package source
 
-import "testing"
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestClassify(t *testing.T) {
 	cases := map[string]FileClass{
@@ -30,6 +35,30 @@ func TestViewableAndIndexed(t *testing.T) {
 	}
 	if IsIndexed("main.go") {
 		t.Fatal("code must NOT be indexed in v1")
+	}
+}
+
+func TestLocalSource_ListIncludesCodeExcludesBinary(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"guide.md", "main.go", "conf.yml", "logo.png"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := NewLocalSource("local", dir)
+	files, err := src.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Path] = true
+	}
+	if !got["guide.md"] || !got["main.go"] || !got["conf.yml"] {
+		t.Fatalf("want guide.md, main.go, conf.yml listed; got %v", got)
+	}
+	if got["logo.png"] {
+		t.Fatal("binary logo.png must not be listed")
 	}
 }
 

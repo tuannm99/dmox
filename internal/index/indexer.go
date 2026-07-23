@@ -25,6 +25,9 @@ func (ix *Indexer) IndexSource(ctx context.Context, workspaceID string, src sour
 	}
 	seen := make(map[string]bool, len(files))
 	for _, f := range files {
+		if !source.IsIndexed(f.Path) {
+			continue
+		}
 		seen[f.Path] = true
 		raw, err := src.Read(ctx, f.Path)
 		if err != nil {
@@ -39,6 +42,9 @@ func (ix *Indexer) IndexSource(ctx context.Context, workspaceID string, src sour
 }
 
 func (ix *Indexer) IndexFile(ctx context.Context, workspaceID string, src source.Source, path string) error {
+	if !source.IsIndexed(path) {
+		return nil
+	}
 	raw, err := src.Read(ctx, path)
 	if err != nil {
 		_, delErr := ix.store.DB().ExecContext(ctx,

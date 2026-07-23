@@ -12,7 +12,8 @@ func TestLocalSource_SyncListRead(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "guide.md"), "# Guide\nhello")
 	mustWrite(t, filepath.Join(dir, "sub", "nested.md"), "# Nested")
-	mustWrite(t, filepath.Join(dir, "ignore.txt"), "not markdown")
+	mustWrite(t, filepath.Join(dir, "code.go"), "package main")
+	mustWrite(t, filepath.Join(dir, "logo.png"), "not viewable")
 
 	s := NewLocalSource("local", dir)
 	ctx := context.Background()
@@ -27,11 +28,11 @@ func TestLocalSource_SyncListRead(t *testing.T) {
 	for _, f := range files {
 		paths[f.Path] = true
 	}
-	if !paths["guide.md"] || !paths["sub/nested.md"] {
+	if !paths["guide.md"] || !paths["sub/nested.md"] || !paths["code.go"] {
 		t.Fatalf("List missing expected files: %+v", files)
 	}
-	if paths["ignore.txt"] {
-		t.Fatalf("List should not include non-markdown files: %+v", files)
+	if paths["logo.png"] {
+		t.Fatalf("List should not include unviewable files: %+v", files)
 	}
 
 	content, err := s.Read(ctx, "guide.md")
