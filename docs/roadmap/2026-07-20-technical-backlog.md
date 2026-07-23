@@ -12,7 +12,7 @@ Trạng thái nhanh:
 | 4 | Realtime sync local files | Critical | 🟢 Xong chiều Local → UI. Chiều UI → Local tách thành item riêng (cần editor) |
 | 5 | Mermaid interaction UX | Medium | 🟢 Xong |
 | 6 | Favorites in Tree View | Medium | 🟢 Xong (2 mục hoãn có chủ đích) |
-| 7 | General File Viewer | High | 🔴 Chưa làm — nền tảng cho #9 |
+| 7 | General File Viewer | High | 🟢 Xong (branch `feat/general-file-viewer`) — nền tảng cho #9 |
 | 8 | Tách Git Explorer khỏi File Explorer | High | 🔴 Chưa làm — redesign chỗ #3 pha A vừa đặt vào tree |
 | 9 | Editor Tab Bar | High | 🔴 Chưa làm — cần #7 trước |
 | 10 | Tách Favorites thành view riêng | Medium | 🔴 Chưa làm — redesign chỗ #6 vừa đặt vào tree |
@@ -272,7 +272,42 @@ Hai mục này chỉ đáng làm khi số lượng favorite thực sự lớn; h
 ---
 
 ## 7. General File Viewer
-Priority: High — 🔴 **Chưa làm**
+Priority: High — 🟢 **Xong** (2026-07-23, branch `feat/general-file-viewer`)
+
+### Đã làm
+Spec: `docs/superpowers/specs/2026-07-23-general-file-viewer-design.md`.
+Plan: `docs/superpowers/plans/2026-07-23-general-file-viewer.md`.
+
+- **Phân loại một cổng** `source.Classify` (doc/text/unsupported) thay `IsDocFile`.
+  Tree hiện mọi file **viewable** (allowlist text/code/config theo ext + tên như
+  Dockerfile/Makefile); binary bị ẩn.
+- **FTS index vẫn docs-only** nhờ guard mới ở `IndexSource` **và** `IndexFile` —
+  cần thiết vì indexer index đúng những gì `List()` trả, không tự lọc. Cờ tương
+  lai chỉ việc nới `IsIndexed`.
+- **File API rẽ nhánh**: doc → markdown như cũ (`kind:markdown`); text → raw +
+  `language` (`kind:code`), cap 1 MiB → `tooLargeToHighlight` fallback plaintext.
+  Static build phát `kind:code`, không nhét code vào search index.
+- **Frontend `CodeView`**: số dòng, copy, highlight.js **lazy** (chunk riêng
+  ~152KB, xác nhận trong `npm run build`), banner file lớn, referential-stable
+  (có test giữ `<pre>` không remount). `FileViewerPage` rẽ theo `kind`.
+
+Kiểm chứng: 179 vitest + toàn bộ go test pass, tsc + gofmt sạch, và **smoke
+binary thật**: `.go`→kind:code/go, file >1MB→tooLarge + body đủ, `.md`→markdown
+giữ mermaid, search `q=main` không trả code file (index docs-only), SPA 200.
+
+**Phát hiện khi chạy thật (không phải khi đọc code):**
+- File **không thuộc allowlist** (vd `.log`) đúng như thiết kế **ẩn khỏi tree**,
+  nhưng `handleFile` dùng `!= ClassDoc` nên **truy vấn trực tiếp `?path=`** vào nó
+  vẫn trả raw dưới dạng `kind:code` thay vì 404. Read-only, không lộ ra ngoài
+  source root, không reachable qua UI — ghi lại để cân nhắc guard `unsupported→404`.
+
+### Chưa làm (hoãn có chủ đích, đúng spec §6)
+- Render standalone `.mmd/.puml` thành hình (v1 hiện source).
+- Đưa code vào FTS index (đã chừa cờ).
+- Overlay in-file search (dùng Ctrl+F native).
+- Render rich cho `.rst/.adoc` (hiện plaintext).
+- Visual browser check (highlight trông đúng chưa, scroll trang code+mermaid
+  không nhảy) — cơ chế remount đã có test tự động; khuyến nghị user liếc mắt.
 
 ### Current issue
 DMOX hiện xoay quanh việc đọc `README.md` (và các doc file được index), chưa mở
