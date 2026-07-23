@@ -12,6 +12,9 @@ export interface FileView {
   body: string;
   headings: { level: number; text: string; slug: string }[];
   is_ai_context: boolean;
+  kind: 'markdown' | 'code';
+  language?: string;
+  tooLargeToHighlight?: boolean;
 }
 
 export interface SearchResult {
