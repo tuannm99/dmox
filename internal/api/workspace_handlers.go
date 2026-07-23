@@ -9,7 +9,10 @@ import (
 	"github.com/tuannm99/dmox/internal/doctree"
 	"github.com/tuannm99/dmox/internal/index"
 	"github.com/tuannm99/dmox/internal/render"
+	"github.com/tuannm99/dmox/internal/source"
 )
+
+const maxHighlightBytes = 1 << 20 // 1 MiB — above this, serve raw, don't highlight
 
 func handleListWorkspaces(a *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -60,11 +63,18 @@ func handleFile(a *app.App) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
 			return
 		}
-		doc := index.Parse(raw, filepath.Base(relPath))
+		base := filepath.Base(relPath)
+		if source.Classify(base) != source.ClassDoc {
+			c.JSON(http.StatusOK, render.CodeFileView(
+				path, raw, source.HighlightLanguage(base), maxHighlightBytes))
+			return
+		}
+		doc := index.Parse(raw, base)
 		body := a.PlantUML.RenderBlocks(c.Request.Context(), doc.Body)
 		c.JSON(http.StatusOK, render.FileView{
 			Path: path, Title: doc.Title, Frontmatter: doc.Frontmatter, Body: body,
 			Headings: render.ExtractHeadings(doc.Body), IsAIContext: index.IsAIContextFile(relPath),
+			Kind: "markdown",
 		})
 	}
 }
