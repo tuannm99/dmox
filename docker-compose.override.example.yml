@@ -1,0 +1,31 @@
+# Copy to docker-compose.override.yml to serve docs from several repos with a
+# SINGLE bind mount instead of one line per repo.
+#
+# The old way (see git history of this file's sibling) mounted each source
+# repo at a container path chosen to match how its relative path in config.yaml
+# resolved against WORKDIR /app — host-specific, one line per repo, easy to get
+# wrong. Instead:
+#
+#   1. Put a .env next to this file with DMOX_ROOT=<host dir holding the repos>
+#      (`make dev` writes it: the parent of this checkout).
+#   2. Use plain relative source paths in config.yaml, e.g. `path: podzone/docs`,
+#      and set `workspace_root: ..` there (see config.docker-example.yaml).
+#
+# DMOX_WORKSPACE_ROOT below overrides that workspace_root to /workspaces (the
+# mount), so relative paths resolve under the mounted parent dir in the
+# container — while the same config.yaml still works with `make run` on the
+# host, where DMOX_WORKSPACE_ROOT is unset and paths resolve against your
+# working dir. One config, both places, no per-repo mounts.
+services:
+  dmox:
+    environment:
+      DMOX_WORKSPACE_ROOT: /workspaces
+    volumes:
+      # Your real config.yaml (locally modified, never committed), replacing
+      # the base compose file's tracked smoke-test config at the same target.
+      - ./config.yaml:/app/config.yaml:ro
+      # The one mount that replaces N per-repo lines: the whole parent dir,
+      # read-only. Every relative source path in config.yaml resolves under it.
+      - ${DMOX_ROOT}:/workspaces:ro
+      # No data mount needed: keep `data_dir: /data` in config.yaml and the
+      # SQLite index lands on the base compose file's `dmox-data` volume.

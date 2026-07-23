@@ -175,6 +175,122 @@ workspaces:
 	}
 }
 
+func TestLoad_WorkspaceRootResolvesRelativeSourcePaths(t *testing.T) {
+	path := writeTemp(t, `
+workspace_root: /srv/repos
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: a
+        type: local
+        path: podzone/docs
+      - id: b
+        type: local
+        path: ./rust-proxy-handbook
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.Workspaces[0].Sources[0].Path; got != "/srv/repos/podzone/docs" {
+		t.Fatalf("source a: expected /srv/repos/podzone/docs, got %q", got)
+	}
+	if got := cfg.Workspaces[0].Sources[1].Path; got != "/srv/repos/rust-proxy-handbook" {
+		t.Fatalf("source b: expected /srv/repos/rust-proxy-handbook, got %q", got)
+	}
+}
+
+func TestLoad_WorkspaceRootLeavesAbsoluteSourcePaths(t *testing.T) {
+	path := writeTemp(t, `
+workspace_root: /srv/repos
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: a
+        type: local
+        path: /home/me/dev/dmox
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.Workspaces[0].Sources[0].Path; got != "/home/me/dev/dmox" {
+		t.Fatalf("expected absolute path unchanged, got %q", got)
+	}
+}
+
+func TestLoad_NoWorkspaceRootKeepsRelativePaths(t *testing.T) {
+	// Backward compat: without workspace_root, a relative path is left as-is
+	// and resolves against the process working dir, exactly as before.
+	path := writeTemp(t, `
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: a
+        type: local
+        path: ../podzone/docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.Workspaces[0].Sources[0].Path; got != "../podzone/docs" {
+		t.Fatalf("expected relative path unchanged, got %q", got)
+	}
+}
+
+func TestLoad_WorkspaceRootExpandsTilde(t *testing.T) {
+	path := writeTemp(t, `
+workspace_root: ~/dev/local
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: a
+        type: local
+        path: podzone/docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("os.UserHomeDir: %v", err)
+	}
+	want := filepath.Join(home, "dev/local", "podzone/docs")
+	if got := cfg.Workspaces[0].Sources[0].Path; got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestLoad_WorkspaceRootEnvOverridesConfig(t *testing.T) {
+	// The same config.yaml must work on the host and inside the container:
+	// DMOX_WORKSPACE_ROOT wins over the file's workspace_root so `docker
+	// compose` can point relative sources at the single mounted parent dir.
+	t.Setenv("DMOX_WORKSPACE_ROOT", "/workspaces")
+	path := writeTemp(t, `
+workspace_root: /home/me/dev/local
+workspaces:
+  - id: docs
+    name: Docs
+    sources:
+      - id: a
+        type: local
+        path: podzone/docs
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.Workspaces[0].Sources[0].Path; got != "/workspaces/podzone/docs" {
+		t.Fatalf("expected env root to win: /workspaces/podzone/docs, got %q", got)
+	}
+}
+
 func TestLoad_AbsoluteDataDirUnchanged(t *testing.T) {
 	path := writeTemp(t, `
 data_dir: /var/lib/dmox

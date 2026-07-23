@@ -118,6 +118,38 @@ project-specific, so they're mounted at runtime. Point `data_dir: /data` in
 your mounted `config.yaml` so the SQLite index and any git-source mirrors
 persist across container restarts via the `dmox-data` volume.
 
+### Serving docs from several repos with one mount
+
+A relative local-source path in `config.yaml` (`path: ../podzone/docs`)
+resolves against the process working dir — the repo root under `make run`, but
+`WORKDIR /app` inside the container. That mismatch used to force a hand-written
+bind mount per repo, each at a container path chosen to match how its relative
+path resolved.
+
+`workspace_root` removes that: relative local-source paths resolve against it
+instead of the working dir. The `DMOX_WORKSPACE_ROOT` env var overrides the
+file value, so **one `config.yaml` works unchanged on the host and in the
+container**:
+
+```yaml
+# config.yaml
+workspace_root: ..            # host: repos live one level up (../podzone, ...)
+workspaces:
+  - id: podzone
+    sources: [{ id: local, type: local, path: podzone/docs }]
+```
+
+```bash
+make dev        # writes .env (DMOX_ROOT=<parent of this repo>), then compose up
+```
+
+`make dev` + `docker-compose.override.example.yml` (copy it to
+`docker-compose.override.yml`) mount that parent dir **once** at `/workspaces`
+and set `DMOX_WORKSPACE_ROOT=/workspaces`, so every relative path resolves
+under the single mount. On the host, `DMOX_WORKSPACE_ROOT` is unset and the
+same paths resolve against `workspace_root: ..`. Absolute source paths, and any
+path when no root is configured, are left exactly as before.
+
 The image runs as a dedicated non-root user, and the final stage is
 `debian:bookworm-slim` (not distroless/scratch) because the Terminal
 panel needs an actual shell to spawn — `git` and `ca-certificates` are the

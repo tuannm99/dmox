@@ -1,4 +1,4 @@
-.PHONY: build-frontend build test run docker-build docker-up docker-down
+.PHONY: build-frontend build test run docker-build docker-up docker-down dev
 
 build-frontend:
 	cd web && npm ci && npm run build
@@ -29,3 +29,12 @@ docker-up:
 
 docker-down:
 	docker compose down -v
+
+# Single-mount dev stack: write a .env pointing DMOX_ROOT at the parent of
+# this checkout (the dir holding your sibling repos) unless one exists, then
+# bring the stack up. Pair with docker-compose.override.example.yml copied to
+# docker-compose.override.yml and relative source paths in config.yaml — see
+# the README's "Docker" section.
+dev:
+	@test -f .env || { printf 'DMOX_ROOT=%s\n' "$$(cd .. && pwd)" > .env; echo "wrote .env: DMOX_ROOT=$$(cd .. && pwd)"; }
+	docker compose up --build

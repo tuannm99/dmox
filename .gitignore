@@ -9,3 +9,4 @@ web/dist/
 .dmox/
 dist
 .worktrees/
+/.env

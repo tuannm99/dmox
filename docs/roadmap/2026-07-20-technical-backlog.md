@@ -7,7 +7,7 @@ Trạng thái nhanh:
 | # | Mục | Priority | Trạng thái |
 |---|-----|----------|------------|
 | 1 | Preserve UI state after reload | High | 🟢 Xong |
-| 2 | Improve docker-compose local mount | High | 🔴 Chưa làm |
+| 2 | Improve docker-compose local mount | High | 🟢 Xong (cơ chế + tests + template; chưa smoke-test bằng docker thật) |
 | 3 | Git integration | High | 🟡 Pha A (read-only) xong. Pha write tách story riêng, chưa bắt đầu |
 | 4 | Realtime sync local files | Critical | 🟢 Xong chiều Local → UI. Chiều UI → Local tách thành item riêng (cần editor) |
 | 5 | Mermaid interaction UX | Medium | 🟢 Xong |
@@ -93,44 +93,49 @@ panel đóng.
 ---
 
 ## 2. Improve docker-compose local mount
-Priority: High — 🔴 **Chưa làm**
-
-### Current issue
-Volume mount chưa hoạt động ổn với nhiều shell/environment.
-
-Ví dụ:
-- bash
-- zsh
-- fish
-- PowerShell
-- Git Bash
-- WSL
-- Docker Desktop
-- Linux native
-
-### Expected
-- Mount source code ổn định trên mọi môi trường.
-- Không cần sửa compose theo từng OS.
-- Auto detect workspace path.
-- Hỗ trợ Windows + WSL + Linux.
+Priority: High — 🟢 **Xong** (2026-07-23)
 
 ### Nguyên nhân gốc
-Path trong `config.yaml` resolve theo `WORKDIR /app` của container. Hệ quả:
-mỗi workspace phải thêm tay một dòng mount ở `docker-compose.override.yml`
-sao cho path trong container khớp path tương đối trong config — hardcode theo
-từng máy, không portable.
+Path tương đối trong `config.yaml` (`../podzone/docs`) resolve theo working dir
+của process — repo root khi `make run`, nhưng `WORKDIR /app` trong container.
+Lệch nhau nên mỗi source phải có một dòng bind mount tay ở
+`docker-compose.override.yml`, mount vào đúng path trong container khớp với cách
+path tương đối resolve. Host-specific, một dòng một repo, dễ sai.
 
-### Plan
-1. Thêm `workspace_root:` vào `config.yaml`, dùng để resolve các source path
-   tương đối. Cắt hẳn ràng buộc với `WORKDIR`, host và container dùng chung
-   một giá trị config.
-2. `.env` (compose tự đọc, hoạt động trên Windows/WSL/mac) + mount **một**
-   thư mục cha duy nhất: `${DMOX_ROOT}:/workspaces:ro`, thay cho N dòng mount.
-3. Unit test resolve path trong `internal/config`.
-4. Wrapper `make dev` sinh `.env` từ pwd nếu chưa có.
+### Đã làm
 
-> Lưu ý Windows: Git Bash mangle path (`MSYS_NO_PATHCONV=1`), Docker Desktop
-> cần bật drive sharing. Hai thứ này phải document — không auto-detect hết được.
+1. **`workspace_root:` trong config** (`internal/config/config.go`) — base dir để
+   resolve các local source path **tương đối**, cắt ràng buộc với working dir.
+   Path tuyệt đối và mọi path khi không set root thì **giữ nguyên** (backward
+   compat: config cũ chạy y hệt như trước).
+2. **`DMOX_WORKSPACE_ROOT` env override** — thắng giá trị trong file, để **một
+   `config.yaml` chạy nguyên cả trên host lẫn trong container**: host resolve
+   theo `workspace_root: ..`, container ghi đè thành `/workspaces` (chỗ mount).
+3. **Mount một thư mục cha duy nhất** thay cho N dòng: `.env.example`
+   (`DMOX_ROOT`), `docker-compose.override.example.yml`
+   (`${DMOX_ROOT}:/workspaces:ro` + `DMOX_WORKSPACE_ROOT=/workspaces`), và
+   `make dev` sinh `.env` từ thư mục cha của repo nếu chưa có.
+4. **Unit test** resolve path trong `internal/config` (5 case: relative→root,
+   absolute giữ nguyên, no-root giữ nguyên, `~` expand, env thắng file).
+5. `config.docker-example.yaml` chuyển sang minh hoạ `workspace_root: /app`;
+   README có mục "Serving docs from several repos with one mount".
+
+Không sửa `config.yaml`/`docker-compose.override.yml` của máy này (đang có thay
+đổi chưa commit) — migration được **document** để tự áp dụng, không áp đặt.
+
+> ⚠️ **Chưa smoke-test bằng docker thật**: Docker backend trong env này hỏng
+> (`/usr/bin/docker: Input/output error`), chỉ validate được YAML bằng parser.
+> Cần chạy `make dev` một lần trên máy có Docker để xác nhận end-to-end.
+
+### Nối với #3 pha A
+Ràng buộc "#3 pha A: mount `docs/` không kèm `.git` thì Git Changes vô dụng"
+được **giải quyết luôn** ở đây: mount cả thư mục cha (`${DMOX_ROOT}`) là mount
+nguyên các checkout đầy đủ, có sẵn `.git` → `WorkingTree()` chạy được trong
+container.
+
+### Chưa làm (Windows-specific, tách khi có người dùng Windows thật)
+Git Bash mangle path (`MSYS_NO_PATHCONV=1`), Docker Desktop drive sharing — chỉ
+document được, không auto-detect. Chưa có máy Windows để kiểm nên chưa làm.
 
 ---
 
@@ -487,19 +492,19 @@ Thứ tự đề xuất cho các mục còn lại:
 
 1. ~~#1 phần còn lại~~ — ✅ xong 2026-07-23.
 2. ~~#3 pha A (read-only git)~~ — ✅ xong 2026-07-23.
-3. **#2 docker mount** — nền tảng cho việc người khác chạy được DMOX. Giờ còn
-   thêm lý do: không mount cả repo thì Git Changes không dùng được.
+3. ~~#2 docker mount~~ — ✅ xong 2026-07-23 (cần smoke-test docker thật).
 4. **#7 General File Viewer** — mở phạm vi sản phẩm; là điều kiện cần của #9.
+   → Track A đã chốt 2026-07-23. **Brainstorm + spec trước khi code.**
 5. **#9 Editor Tab Bar** — ngay sau #7, cùng nhau mới thành "workspace".
 6. **#8 + #10 cùng một đợt** — dựng activity bar tách view một lần, rồi dời Git
    Changes và Favorites ra khỏi tree. Làm sau #7/#9 vì Open-in-New-Tab của cả
    hai view đều trỏ vào tab bar.
 7. **#3 pha B** — chỉ sau khi có story + brainstorm riêng.
 
-> Nếu roadmap business (self-host per company) sắp tới gần thì **#2 phải nhảy
-> lên đầu**: đó là thứ khách hàng chạm vào đầu tiên, trước cả tính năng. #7–#10
-> là hướng "IDE cho docs" — mạnh về trải nghiệm nhưng không phải thứ khách chạm
-> đầu tiên, nên đứng sau #2.
+> **Track đã chọn (2026-07-23): "IDE cho docs" (#7 → #9 → #8/#10).** Business
+> roadmap (Sprint 1 refactor `Workspace→Repository→Source`, auth) **chưa động
+> tới** — khi self-host per company tới gần thì nó nhảy lên trước #7. Ghi rõ ở
+> đây để lần sau không quên là nhánh đó đang nợ.
 
 ---
 

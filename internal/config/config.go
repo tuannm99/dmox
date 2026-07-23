@@ -10,12 +10,19 @@ import (
 )
 
 type Config struct {
-	Workspaces []Workspace       `yaml:"workspaces"`
-	Embeddings EmbeddingsConfig  `yaml:"embeddings"`
-	Render     RenderConfig      `yaml:"render"`
-	Server     ServerConfig      `yaml:"server"`
-	DataDir    string            `yaml:"data_dir"`
-	Keymap     map[string]string `yaml:"keymap"`
+	Workspaces []Workspace      `yaml:"workspaces"`
+	Embeddings EmbeddingsConfig `yaml:"embeddings"`
+	Render     RenderConfig     `yaml:"render"`
+	Server     ServerConfig     `yaml:"server"`
+	DataDir    string           `yaml:"data_dir"`
+	// WorkspaceRoot is the base directory that relative local-source paths
+	// resolve against, decoupling them from the process working dir (which
+	// under Docker is WORKDIR /app, forcing a hand-written mount per source).
+	// The DMOX_WORKSPACE_ROOT env var overrides this so one config.yaml works
+	// unchanged on the host and in the container. Empty means "resolve against
+	// the working dir", the original behaviour.
+	WorkspaceRoot string            `yaml:"workspace_root"`
+	Keymap        map[string]string `yaml:"keymap"`
 }
 
 type Workspace struct {
@@ -87,11 +94,25 @@ func (c *Config) applyDefaults() {
 		}
 	}
 	c.DataDir = expandHome(c.DataDir)
+
+	// DMOX_WORKSPACE_ROOT overrides the file's workspace_root so the same
+	// config.yaml resolves correctly on the host and inside the container.
+	root := c.WorkspaceRoot
+	if env := os.Getenv("DMOX_WORKSPACE_ROOT"); env != "" {
+		root = env
+	}
+	root = expandHome(root)
+
 	for wi := range c.Workspaces {
 		for si := range c.Workspaces[wi].Sources {
 			s := &c.Workspaces[wi].Sources[si]
 			if s.Type == "git" && s.Branch == "" {
 				s.Branch = "main"
+			}
+			// Anchor a relative local path to the workspace root; absolute
+			// paths (and every path when no root is set) are left untouched.
+			if s.Type == "local" && root != "" && s.Path != "" && !filepath.IsAbs(s.Path) {
+				s.Path = filepath.Join(root, s.Path)
 			}
 		}
 	}

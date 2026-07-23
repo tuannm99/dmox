@@ -1,10 +1,17 @@
+# workspace_root anchors relative local-source paths (below) to a base dir
+# instead of the process working dir (WORKDIR /app in the container). Here it
+# is /app, so the smoke-test source resolves to /app/example/docs, matching the
+# base compose file's mount. For real multi-repo use, set it to the parent of
+# your repos (e.g. `..`) and override it in the container with
+# DMOX_WORKSPACE_ROOT=/workspaces — see docker-compose.override.example.yml.
+workspace_root: /app
 workspaces:
   - id: example
     name: "Example Docs"
     sources:
       - id: local
         type: local
-        path: ./example/docs
+        path: example/docs
 data_dir: /data
 server:
   addr: ":8080"
