@@ -1,14 +1,20 @@
 package render
 
-import "regexp"
+import (
+	"path"
+	"regexp"
+)
 
 type FileView struct {
-	Path        string         `json:"path"`
-	Title       string         `json:"title"`
-	Frontmatter map[string]any `json:"frontmatter"`
-	Body        string         `json:"body"`
-	Headings    []Heading      `json:"headings"`
-	IsAIContext bool           `json:"is_ai_context"`
+	Path                string         `json:"path"`
+	Title               string         `json:"title"`
+	Frontmatter         map[string]any `json:"frontmatter"`
+	Body                string         `json:"body"`
+	Headings            []Heading      `json:"headings"`
+	IsAIContext         bool           `json:"is_ai_context"`
+	Kind                string         `json:"kind"`
+	Language            string         `json:"language,omitempty"`
+	TooLargeToHighlight bool           `json:"tooLargeToHighlight,omitempty"`
 }
 
 type Heading struct {
@@ -66,4 +72,20 @@ func trimDashes(s string) string {
 		end--
 	}
 	return s[start:end]
+}
+
+// CodeFileView builds the view for a non-markdown text file: raw content plus a
+// highlight language. Over maxBytes it keeps the full body but signals the
+// client to skip (expensive) highlighting and show plaintext.
+func CodeFileView(p string, raw []byte, language string, maxBytes int) FileView {
+	return FileView{
+		Path:                p,
+		Title:               path.Base(p),
+		Frontmatter:         map[string]any{},
+		Body:                string(raw),
+		Headings:            []Heading{},
+		Kind:                "code",
+		Language:            language,
+		TooLargeToHighlight: len(raw) > maxBytes,
+	}
 }
