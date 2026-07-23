@@ -75,12 +75,19 @@ func Build(ctx context.Context, a *app.App, opts Options) error {
 		if err != nil {
 			return fmt.Errorf("build: read %s: %w", path, err)
 		}
+		if !source.IsIndexed(relPath) {
+			fv := render.CodeFileView(path, raw, source.HighlightLanguage(filepath.Base(relPath)), 1<<20)
+			if err := writeJSON(filepath.Join(opts.OutDir, "data", "files", path+".json"), fv); err != nil {
+				return fmt.Errorf("build: write file json %s: %w", path, err)
+			}
+			continue
+		}
 		doc := index.Parse(raw, filepath.Base(relPath))
 		body := a.PlantUML.RenderBlocks(ctx, doc.Body)
 		isAI := index.IsAIContextFile(relPath)
 		fv := render.FileView{
 			Path: path, Title: doc.Title, Frontmatter: doc.Frontmatter, Body: body,
-			Headings: render.ExtractHeadings(doc.Body), IsAIContext: isAI,
+			Headings: render.ExtractHeadings(doc.Body), IsAIContext: isAI, Kind: "markdown",
 		}
 		if err := writeJSON(filepath.Join(opts.OutDir, "data", "files", path+".json"), fv); err != nil {
 			return fmt.Errorf("build: write file json %s: %w", path, err)
