@@ -3,6 +3,7 @@ import { Link, useNavigationType, useOutletContext, useParams } from 'react-rout
 import { readScrollTop, restoreScrollTop, saveScrollTop } from '../scrollMemory';
 import { useDataSource } from '../datasource/context';
 import { MarkdownView } from '../components/MarkdownView';
+import { CodeView } from '../components/CodeView';
 import { GitHistoryPanel } from '../components/GitHistoryPanel';
 import { flattenLeaves } from '../components/TreeView';
 import type { WorkspaceOutletContext } from './WorkspaceLayout';
@@ -170,7 +171,11 @@ export function FileViewerPage() {
       </nav>
       {file.is_ai_context && <div className="ai-context-badge">AI Context File</div>}
       <h1>{file.title}</h1>
-      <MarkdownView body={file.body} workspaceId={workspaceId} currentPath={wildcardPath} />
+      {file.kind === 'code' ? (
+        <CodeView body={file.body} language={file.language} tooLargeToHighlight={file.tooLargeToHighlight} />
+      ) : (
+        <MarkdownView body={file.body} workspaceId={workspaceId} currentPath={wildcardPath} />
+      )}
       <GitHistoryPanel workspaceId={workspaceId} path={wildcardPath} />
     </article>
   );
