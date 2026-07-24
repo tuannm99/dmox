@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useDataSource } from '../datasource/context';
+import { useTabs } from '../useTabs';
+import { TabBar } from '../components/TabBar';
 import { TreeView } from '../components/TreeView';
 import type { TreeNode, ChangeEvent } from '../datasource/types';
 import { RightPanel } from '../components/RightPanel';
@@ -78,6 +80,59 @@ export function WorkspaceLayout() {
   const statusOfPath = useCallback((path: string) => gitStatus.byPath.get(path)?.status, [gitStatus]);
   const docPrefix = `/w/${workspaceId}/doc/`;
   const currentPath = location.pathname.startsWith(docPrefix) ? location.pathname.slice(docPrefix.length) : undefined;
+  const navigate = useNavigate();
+  const { tabs, ensureTab, promote, close, closeOthers, closeAll } = useTabs(workspaceId);
+
+  // The URL is the source of truth for which tab is active; this only makes sure
+  // a tab exists for whatever the URL points at. `preview` comes from the link
+  // that navigated here (see TreeView) — a reload or back/forward carries no
+  // state, and the tab is already in the persisted list with its own flag.
+  useEffect(() => {
+    if (!currentPath) return;
+    const preview = (location.state as { preview?: boolean } | null)?.preview === true;
+    ensureTab(currentPath, { preview });
+  }, [currentPath, location.state, ensureTab]);
+
+  const goToTab = useCallback(
+    (path: string) => navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } }),
+    [navigate, workspaceId]
+  );
+
+  const closeTab = useCallback(
+    (path: string) => {
+      // Only the active tab forces a navigation; closing a background tab must
+      // leave the reader where they are.
+      if (path === currentPath) {
+        const idx = tabs.findIndex((t) => t.path === path);
+        const next = tabs[idx + 1] ?? tabs[idx - 1];
+        if (next) navigate(`/w/${workspaceId}/doc/${next.path}`, { state: { restoreScroll: true } });
+        else navigate(`/w/${workspaceId}`);
+      }
+      close(path);
+    },
+    [close, currentPath, navigate, tabs, workspaceId]
+  );
+
+  const closeOtherTabs = useCallback((path: string) => {
+    closeOthers(path);
+    if (path !== currentPath) navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } });
+  }, [closeOthers, currentPath, navigate, workspaceId]);
+
+  const closeAllTabs = useCallback(() => {
+    closeAll();
+    navigate(`/w/${workspaceId}`);
+  }, [closeAll, navigate, workspaceId]);
+
+  const copyTabPath = useCallback((path: string) => {
+    navigator.clipboard?.writeText(path);
+  }, []);
+
+  // Reveal = expand the tree down to the file and make it active; the existing
+  // reveal effect then scrolls the highlighted node into view.
+  const revealTab = useCallback((path: string) => {
+    expandAncestors(path);
+    if (path !== currentPath) navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } });
+  }, [currentPath, expandAncestors, navigate, workspaceId]);
 
   useEffect(() => {
     currentPathRef.current = currentPath;
@@ -285,6 +340,7 @@ export function WorkspaceLayout() {
               isExpanded={isExpanded}
               onToggleExpanded={toggleExpanded}
               gitStatus={statusOfPath}
+              onPromoteTab={promote}
             />
           </div>
         </nav>
@@ -295,9 +351,21 @@ export function WorkspaceLayout() {
           aria-label="Resize sidebar"
           onMouseDown={handleResizeMouseDown}
         />
-        <main className="content" ref={contentRef}>
-          <Outlet context={{ tree, scrollToTop, resetScroll, contentRef, fileChangeEvent } satisfies WorkspaceOutletContext} />
-        </main>
+        <div className="content-area">
+          <TabBar
+            tabs={tabs}
+            activePath={currentPath}
+            onSelect={goToTab}
+            onClose={closeTab}
+            onCloseOthers={closeOtherTabs}
+            onCloseAll={closeAllTabs}
+            onCopyPath={copyTabPath}
+            onReveal={revealTab}
+          />
+          <main className="content" ref={contentRef}>
+            <Outlet context={{ tree, scrollToTop, resetScroll, contentRef, fileChangeEvent } satisfies WorkspaceOutletContext} />
+          </main>
+        </div>
         {openedPanels.size > 0 && (
           <RightPanel open={activePanel !== null} title={panelTitle(activePanel)} onClose={() => setActivePanel(null)}>
             {openedPanels.has('terminal') && (

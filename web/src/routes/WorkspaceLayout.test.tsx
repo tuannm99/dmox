@@ -99,6 +99,39 @@ function renderWithDataSource(ds: any, path = '/w/ws') {
   );
 }
 
+// Two sibling files under `local/` so the tab-bar tests below have a
+// neighbouring tab to switch to when the active one closes.
+const twoFileTree = {
+  name: 'WS',
+  path: '',
+  is_dir: true,
+  children: [
+    {
+      name: 'local',
+      path: 'local',
+      is_dir: true,
+      children: [
+        { name: 'guide.md', path: 'local/guide.md', is_dir: false },
+        { name: 'other.md', path: 'local/other.md', is_dir: false },
+      ],
+    },
+  ],
+};
+
+function renderLayoutAt(path: string, ds: any = { getTree: vi.fn().mockResolvedValue(twoFileTree) }) {
+  (globalThis as any).__testDataSource = ds;
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+          <Route index element={<div>welcome</div>} />
+          <Route path="doc/*" element={<div>doc page</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe('WorkspaceLayout', () => {
   it('shows a loading state then renders the tree', async () => {
     const ds = { getTree: vi.fn().mockResolvedValue({ name: 'WS', path: '', is_dir: true, children: [] }) };
@@ -427,5 +460,20 @@ describe('WorkspaceLayout', () => {
     expect(screen.getByRole('button', { name: /terminal/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('button', { name: 'Close panel' })).not.toBeInTheDocument();
     expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
+  it('opens a tab for the file in the URL and marks it active', async () => {
+    renderLayoutAt('/w/ws/doc/local/guide.md');
+    expect(await screen.findByRole('tab', { name: /guide\.md/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('closing the active tab moves to the neighbouring tab', async () => {
+    renderLayoutAt('/w/ws/doc/local/guide.md');
+    await screen.findByRole('tab', { name: /guide\.md/ });
+    // open a second file from the tree, then close the active one
+    fireEvent.click(await screen.findByRole('link', { name: /other\.md/ }));
+    await screen.findByRole('tab', { name: /other\.md/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Close other.md' }));
+    expect(await screen.findByRole('tab', { name: /guide\.md/ })).toHaveAttribute('aria-selected', 'true');
   });
 });

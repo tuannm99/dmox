@@ -95,6 +95,10 @@ export function TreeView({
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
+  /** Marks a tab as no-longer-preview when its file is opened permanently
+   *  (e.g. double-click) — consumed starting in a later task; threaded
+   *  through now so callers can start passing it. */
+  onPromoteTab?: (path: string) => void;
 } & TreeFavoriteProps &
   TreeExpandProps &
   TreeGitProps) {

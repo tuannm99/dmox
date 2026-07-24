@@ -236,9 +236,17 @@ body,
   background: #8882;
 }
 
+.content-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 .content {
   flex: 1;
-  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
   padding: 1.5rem 2rem;
