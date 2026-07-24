@@ -108,6 +108,18 @@ describe('TreeView', () => {
     // the directory should still be expanded (favorite click didn't also collapse it)
     expect(screen.getByRole('link', { name: 'guide.md' })).toBeVisible();
   });
+
+  it('promotes a previewed file to a permanent tab on double click', () => {
+    const onPromoteTab = vi.fn();
+    render(
+      <MemoryRouter>
+        <TreeView node={tree} workspaceId="ws" onPromoteTab={onPromoteTab} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /local/ }));
+    fireEvent.doubleClick(screen.getByRole('link', { name: /guide\.md/ }));
+    expect(onPromoteTab).toHaveBeenCalledWith('local/guide.md');
+  });
 });
 
 describe('findNodeByPath', () => {

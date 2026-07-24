@@ -82,6 +82,11 @@ function GitBadge({ node, gitStatus }: { node: TreeNode } & TreeGitProps) {
   );
 }
 
+export interface TreeTabProps {
+  /** Double-clicking a file turns its reusable preview tab into a permanent one. */
+  onPromoteTab?: (path: string) => void;
+}
+
 export function TreeView({
   node,
   workspaceId,
@@ -91,17 +96,15 @@ export function TreeView({
   isExpanded,
   onToggleExpanded,
   gitStatus,
+  onPromoteTab,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
-  /** Marks a tab as no-longer-preview when its file is opened permanently
-   *  (e.g. double-click) — consumed starting in a later task; threaded
-   *  through now so callers can start passing it. */
-  onPromoteTab?: (path: string) => void;
 } & TreeFavoriteProps &
   TreeExpandProps &
-  TreeGitProps) {
+  TreeGitProps &
+  TreeTabProps) {
   return (
     <ul className="tree">
       {sortedChildren(node).map((child) => (
@@ -115,6 +118,7 @@ export function TreeView({
           isExpanded={isExpanded}
           onToggleExpanded={onToggleExpanded}
           gitStatus={gitStatus}
+          onPromoteTab={onPromoteTab}
         />
       ))}
     </ul>
@@ -130,13 +134,15 @@ function TreeNodeItem({
   isExpanded,
   onToggleExpanded,
   gitStatus,
+  onPromoteTab,
 }: {
   node: TreeNode;
   workspaceId: string;
   currentPath?: string;
 } & TreeFavoriteProps &
   TreeExpandProps &
-  TreeGitProps) {
+  TreeGitProps &
+  TreeTabProps) {
   // Uncontrolled fallback (no isExpanded/onToggleExpanded passed) still
   // defaults to collapsed, matching the controlled default — nothing about
   // "not persisted" should mean "open by default".
@@ -178,6 +184,7 @@ function TreeNodeItem({
                 isExpanded={isExpanded}
                 onToggleExpanded={onToggleExpanded}
                 gitStatus={gitStatus}
+                onPromoteTab={onPromoteTab}
               />
             ))}
           </ul>
@@ -189,7 +196,12 @@ function TreeNodeItem({
   return (
     <li>
       <div className="tree-row">
-        <Link className={active ? 'tree-file active' : 'tree-file'} to={`/w/${workspaceId}/doc/${node.path}`}>
+        <Link
+          className={active ? 'tree-file active' : 'tree-file'}
+          to={`/w/${workspaceId}/doc/${node.path}`}
+          state={{ preview: true }}
+          onDoubleClick={() => onPromoteTab?.(node.path)}
+        >
           <span className="tree-icon" aria-hidden="true">
             📄
           </span>
