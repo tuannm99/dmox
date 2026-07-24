@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
 type LocalSource struct {
@@ -38,6 +40,7 @@ func (s *LocalSource) Sync(ctx context.Context) error {
 }
 
 func (s *LocalSource) List(ctx context.Context) ([]FileInfo, error) {
+	matcher := ignoreMatcher(s.root)
 	var files []FileInfo
 	err := filepath.WalkDir(s.root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -47,6 +50,12 @@ func (s *LocalSource) List(ctx context.Context) ([]FileInfo, error) {
 			if strings.HasPrefix(d.Name(), ".") && p != s.root {
 				return filepath.SkipDir
 			}
+			if p != s.root && matcher.Match(relComponents(s.root, p), true) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if matcher.Match(relComponents(s.root, p), false) {
 			return nil
 		}
 		if !IsViewable(d.Name()) {
@@ -88,22 +97,32 @@ func (s *LocalSource) Watch(ctx context.Context) (<-chan ChangeEvent, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := addRecursive(w, s.root); err != nil {
+	matcher := ignoreMatcher(s.root)
+	if err := addRecursive(w, s.root, s.root, matcher); err != nil {
 		w.Close()
 		return nil, err
 	}
 	out := make(chan ChangeEvent, 16)
-	go debounceWatch(ctx, w, s.root, out)
+	go debounceWatch(ctx, w, s.root, matcher, out)
 	return out, nil
 }
 
-func addRecursive(w *fsnotify.Watcher, root string) error {
-	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+// addRecursive walks walkRoot and registers an fsnotify watch on every
+// directory that isn't dotfile-skipped or matched by the sourceRoot's
+// gitignore matcher. sourceRoot is the LocalSource root the matcher's
+// patterns were read relative to; walkRoot is where the walk starts (equal
+// to sourceRoot for the initial call, or a newly created subdirectory when
+// called from debounceWatch).
+func addRecursive(w *fsnotify.Watcher, sourceRoot, walkRoot string, matcher gitignore.Matcher) error {
+	return filepath.WalkDir(walkRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") && p != root {
+			if strings.HasPrefix(d.Name(), ".") && p != sourceRoot {
+				return filepath.SkipDir
+			}
+			if p != sourceRoot && matcher.Match(relComponents(sourceRoot, p), true) {
 				return filepath.SkipDir
 			}
 			return w.Add(p)
@@ -112,7 +131,7 @@ func addRecursive(w *fsnotify.Watcher, root string) error {
 	})
 }
 
-func debounceWatch(ctx context.Context, w *fsnotify.Watcher, root string, out chan<- ChangeEvent) {
+func debounceWatch(ctx context.Context, w *fsnotify.Watcher, root string, matcher gitignore.Matcher, out chan<- ChangeEvent) {
 	defer w.Close()
 	defer close(out)
 	pending := map[string]ChangeOp{}
@@ -154,7 +173,7 @@ func debounceWatch(ctx context.Context, w *fsnotify.Watcher, root string, out ch
 			case ev.Op&fsnotify.Create != 0:
 				pending[rel] = ChangeOpCreate
 				if info, err := os.Stat(ev.Name); err == nil && info.IsDir() {
-					_ = addRecursive(w, ev.Name)
+					_ = addRecursive(w, root, ev.Name, matcher)
 				}
 			case ev.Op&fsnotify.Write != 0:
 				if _, exists := pending[rel]; !exists {
@@ -168,6 +187,34 @@ func debounceWatch(ctx context.Context, w *fsnotify.Watcher, root string, out ch
 			flush()
 		}
 	}
+}
+
+// ignoreMatcher builds a gitignore matcher from the patterns found in root
+// and any nested .gitignore files beneath it. A root that isn't a git repo
+// (no .gitignore anywhere) is a normal, non-error case: ReadPatterns errors
+// are swallowed and yield an empty matcher that ignores nothing, rather than
+// failing the caller.
+func ignoreMatcher(root string) gitignore.Matcher {
+	fsys := osfs.New(root)
+	patterns, err := gitignore.ReadPatterns(fsys, nil)
+	if err != nil {
+		patterns = nil
+	}
+	return gitignore.NewMatcher(patterns)
+}
+
+// relComponents returns p's path relative to root, split into components as
+// required by gitignore.Matcher.Match (e.g. ["web", "node_modules", "x.js"]).
+func relComponents(root, p string) []string {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return nil
+	}
+	rel = filepath.ToSlash(rel)
+	if rel == "." || rel == "" {
+		return nil
+	}
+	return strings.Split(rel, "/")
 }
 
 func extLower(name string) string {
