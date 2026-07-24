@@ -295,7 +295,14 @@ Kiểm chứng: 179 vitest + toàn bộ go test pass, tsc + gofmt sạch, và **
 binary thật**: `.go`→kind:code/go, file >1MB→tooLarge + body đủ, `.md`→markdown
 giữ mermaid, search `q=main` không trả code file (index docs-only), SPA 200.
 
-**Phát hiện khi chạy thật (không phải khi đọc code):**
+**Phát hiện khi chạy trên repo thật — phải fix ngay mới dùng được:**
+- Tree mở ra mọi file khiến workspace trỏ vào repo code **ngập `node_modules/`
+  + build output**: đo được **12.528 file** trên workspace `myself`. Đã làm
+  **respect `.gitignore`** (go-git `gitignore`, không thêm dep) cho `LocalSource`
+  ở cả `List` lẫn đường đăng ký watcher → **12.528 → 166 file**, đúng source
+  thật. Spec riêng: `2026-07-23-gitignore-aware-tree-design.md`.
+
+**Phát hiện khác khi chạy thật (không phải khi đọc code):**
 - File **không thuộc allowlist** (vd `.log`) đúng như thiết kế **ẩn khỏi tree**,
   nhưng `handleFile` dùng `!= ClassDoc` nên **truy vấn trực tiếp `?path=`** vào nó
   vẫn trả raw dưới dạng `kind:code` thay vì 404. Read-only, không lộ ra ngoài
@@ -492,7 +499,9 @@ Giống #8: **redesign** chỗ #6 vừa gắn vào tree, tái sử dụng nguyê
 - Large repository optimization.
 - Incremental tree refresh.
 - File cache.
-- Ignore theo .gitignore.
+- ~~Ignore theo .gitignore~~ — ✅ **xong 2026-07-23** (bắt buộc phải làm ngay sau
+  #7: tree mở rộng ra mọi file làm `node_modules`/build output ngập lên. Spec:
+  `docs/superpowers/specs/2026-07-23-gitignore-aware-tree-design.md`).
 
 ### Workspace evolution (đã hình thành thành #7–#10)
 
