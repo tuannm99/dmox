@@ -916,3 +916,74 @@ a.doc-pager-link:hover {
 .code-line-no { font-variant-numeric: tabular-nums; font-family: monospace; line-height: 1.5; font-size: 13px; }
 .code-pre { margin: 0; padding: 12px; overflow: visible; }
 .code-pre code { font-family: monospace; line-height: 1.5; font-size: 13px; white-space: pre; }
+
+/* --- TabBar (VS Code-style editor tab bar) ------------------------------ */
+
+.tab-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-right: 1px solid rgba(128, 128, 128, 0.2);
+  font-size: 13px;
+}
+
+.tab.active {
+  background: rgba(99, 102, 241, 0.16);
+  font-weight: 600;
+}
+
+.tab.preview .tab-name {
+  font-style: italic;
+}
+
+.tab-close {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+}
+
+.tab-close:hover {
+  opacity: 1;
+}
+
+.tab-menu {
+  position: fixed;
+  z-index: 50;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  min-width: 160px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.tab-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-menu button:hover {
+  background: rgba(99, 102, 241, 0.16);
+}
