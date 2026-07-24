@@ -286,6 +286,11 @@ describe('FileViewerPage', () => {
       return (
         <main className="content" ref={attach}>
           <Link to="/w/ws/doc/local/c.md">open c</Link>
+          {/* Mirrors how WorkspaceLayout's tab bar navigates (Task 3): a PUSH
+              carrying { restoreScroll: true } in router state. */}
+          <Link to="/w/ws/doc/local/c.md" state={{ restoreScroll: true }}>
+            open c as tab
+          </Link>
           <Outlet context={{ tree: undefined, scrollToTop: vi.fn(), resetScroll, contentRef, fileChangeEvent: null }} />
         </main>
       );
@@ -334,6 +339,34 @@ describe('FileViewerPage', () => {
       await screen.findByText('index');
 
       // Clicking a link is a PUSH, not a POP: a fresh read starts at the top.
+      fireEvent.click(screen.getByRole('link', { name: 'open c' }));
+      await screen.findByRole('heading', { name: 'C' });
+
+      expect(view.resetScroll).toHaveBeenCalled();
+      expect(view.content().scrollTop).toBe(0);
+    });
+
+    it('restores the saved position when a tab click asks for it (PUSH with restoreScroll state)', async () => {
+      sessionStorage.clear();
+      sessionStorage.setItem('dmox-scroll-ws:local/c.md', '1200');
+      const view = renderAt('/w/ws');
+      await screen.findByText('index');
+
+      // Clicking a tab is a PUSH, not a POP — but it's flagged, so it must
+      // still restore, unlike an ordinary fresh-open PUSH.
+      fireEvent.click(screen.getByRole('link', { name: 'open c as tab' }));
+      await screen.findByRole('heading', { name: 'C' });
+
+      await waitFor(() => expect(view.content().scrollTop).toBe(1200));
+      expect(view.resetScroll).not.toHaveBeenCalled();
+    });
+
+    it('still starts at the top when a file is opened fresh from the tree (PUSH with no state)', async () => {
+      sessionStorage.clear();
+      sessionStorage.setItem('dmox-scroll-ws:local/c.md', '1200');
+      const view = renderAt('/w/ws');
+      await screen.findByText('index');
+
       fireEvent.click(screen.getByRole('link', { name: 'open c' }));
       await screen.findByRole('heading', { name: 'C' });
 

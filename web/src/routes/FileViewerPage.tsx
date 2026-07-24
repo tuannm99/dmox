@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigationType, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigationType, useOutletContext, useParams } from 'react-router-dom';
 import { readScrollTop, restoreScrollTop, saveScrollTop } from '../scrollMemory';
 import { useDataSource } from '../datasource/context';
 import { MarkdownView } from '../components/MarkdownView';
@@ -24,6 +24,7 @@ export function FileViewerPage() {
   // genuine navigation to a different file" — see that effect for why.
   const suppressNextResetScrollRef = useRef(false);
   const navigationType = useNavigationType();
+  const location = useLocation();
   const restoredForRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -63,7 +64,12 @@ export function FileViewerPage() {
     }
     const el = outletContext?.contentRef?.current;
     const saved = readScrollTop(workspaceId, wildcardPath);
-    if (el && saved > 0 && navigationType === 'POP' && restoredForRef.current !== wildcardPath) {
+    // A reload or back/forward ('POP') restores, and so does clicking a tab —
+    // WorkspaceLayout flags those navigations, because switching tabs must not
+    // lose your place. Opening a file fresh from the tree carries no flag and
+    // still starts at the top.
+    const askedToRestore = (location.state as { restoreScroll?: boolean } | null)?.restoreScroll === true;
+    if (el && saved > 0 && (navigationType === 'POP' || askedToRestore) && restoredForRef.current !== wildcardPath) {
       restoredForRef.current = wildcardPath;
       return restoreScrollTop(el, saved);
     }
