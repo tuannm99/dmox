@@ -14,7 +14,7 @@ Trạng thái nhanh:
 | 6 | Favorites in Tree View | Medium | 🟢 Xong (2 mục hoãn có chủ đích) |
 | 7 | General File Viewer | High | 🟢 Xong (branch `feat/general-file-viewer`) — nền tảng cho #9 |
 | 8 | Tách Git Explorer khỏi File Explorer | High | 🔴 Chưa làm — redesign chỗ #3 pha A vừa đặt vào tree |
-| 9 | Editor Tab Bar | High | 🔴 Chưa làm — cần #7 trước |
+| 9 | Editor Tab Bar | High | 🟢 Xong (branch `feat/editor-tab-bar`) |
 | 10 | Tách Favorites thành view riêng | Medium | 🔴 Chưa làm — redesign chỗ #6 vừa đặt vào tree |
 
 > **#7–#10 là một cụm "DMOX → Documentation Workspace".** #7 mở phạm vi từ
@@ -406,7 +406,54 @@ vì cả hai đều là "dựng activity bar + tách view" — làm hạ tầng 
 ---
 
 ## 9. Editor Tab Bar
-Priority: High — 🔴 **Chưa làm** — cần **#7** trước
+Priority: High — 🟢 **Xong** (2026-07-23, branch `feat/editor-tab-bar`)
+
+### Đã làm
+Spec: `docs/superpowers/specs/2026-07-23-editor-tab-bar-design.md`.
+Plan: `docs/superpowers/plans/2026-07-23-editor-tab-bar.md`.
+
+- **URL là source of truth cho tab active** — `useTabs` cố tình **không** lưu
+  `activeTab`. Back/Forward không thể lệch với tab strip, vì không có biến thứ
+  hai để lệch. Đây là quyết định kiến trúc chính, không phải chi tiết.
+- **Preview tab kiểu VS Code**: single click mở tab preview (in nghiêng) dùng
+  lại được — click file khác **thay chỗ** nó; double click ghim thành cố định.
+  Ý định đi qua `location.state.preview`, không cần state song song.
+- Tab list persist `localStorage: dmox-tabs-${workspaceId}`; đóng tab active
+  nhảy sang tab kề (phải trước, rồi trái), đóng tab cuối về trang workspace.
+- Context menu: Close / Close Others / Close All / Copy Path / Reveal in
+  Explorer; middle-click đóng.
+- **Nới luật scroll**: trước đây chỉ restore khi `POP` (reload/back-forward),
+  giờ restore thêm khi `location.state.restoreScroll` (tab click) — mở file mới
+  từ tree vẫn về đầu trang.
+
+Kiểm chứng: 201 vitest + toàn bộ go test pass, tsc/gofmt sạch, **và đo bằng
+Chromium thật** (không chỉ suy luận CSS):
+
+| Thao tác | Kết quả đo |
+|---|---|
+| single-click alpha | 1 tab, in nghiêng |
+| single-click beta | **vẫn 1 tab** (preview bị thay chỗ) |
+| double-click beta | 1 tab, hết nghiêng (đã ghim) |
+| single-click alpha | 2 tab: beta ghim + alpha nghiêng |
+| đóng tab active | còn 1, tab kề thành active |
+| reload | giữ nguyên tab |
+| scroll 900 → đổi tab → quay lại | 900 |
+
+### Bẫy CSS suýt dính (đọc code mới thấy, không phải khi chạy)
+`.content` đang có `height: 100%`. Bọc nó dưới tab bar trong flex column là nó
+tràn **đúng bằng chiều cao tab bar**, và vì shell clip overflow nên **dòng cuối
+của mọi tài liệu bị cắt im lặng** — đúng failure mode `CLAUDE.md` cảnh báo. Đã
+đổi sang `flex: 1; min-height: 0` + wrapper `.content-area`. Đo lại bằng
+Chromium: `areaH 764 = barH 28 + contentH 736`, marker dòng cuối `bottom 677 ≤
+contentBottom 800` → không bị cắt.
+
+### Chưa làm (hoãn có chủ đích, đúng spec §6)
+- Pin tab, drag & drop sắp xếp.
+- Modified indicator (DMOX read-only, chưa có nghĩa).
+- Phím tắt chuyển/đóng tab (hệ keymap đã có, thêm sau).
+- Phân biệt tab trùng tên (`index.ts` × 5) — hiện chỉ dựa `title` tooltip. Trên
+  repo code sẽ gặp sớm, là ứng viên số một cho đợt sau.
+- Split view / nhiều nhóm tab.
 
 ### Current issue
 Muốn xem nhiều file phải đóng file đang xem hoặc mở tab trình duyệt mới — gián
