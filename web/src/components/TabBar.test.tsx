@@ -2,6 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TabBar } from './TabBar';
 
+// jsdom doesn't implement Element.scrollIntoView — polyfill so it can be spied on.
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
 const tabs = [
   { path: 'local/a.md', preview: false },
   { path: 'local/sub/b.go', preview: true },
@@ -79,5 +84,19 @@ describe('TabBar', () => {
         onCloseOthers={vi.fn()} onCloseAll={vi.fn()} onCopyPath={vi.fn()} onReveal={vi.fn()} />
     );
     expect(container.querySelector('.tab')).toBe(first);
+  });
+
+  it('scrolls the active tab into view when the active path changes', () => {
+    const scrollIntoViewSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const { rerender } = setup();
+    scrollIntoViewSpy.mockClear(); // ignore the call from the initial mount
+
+    rerender(
+      <TabBar tabs={tabs} activePath="local/sub/b.go" onSelect={vi.fn()} onClose={vi.fn()}
+        onCloseOthers={vi.fn()} onCloseAll={vi.fn()} onCopyPath={vi.fn()} onReveal={vi.fn()} />
+    );
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+    scrollIntoViewSpy.mockRestore();
   });
 });

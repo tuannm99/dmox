@@ -37,6 +37,20 @@ function readStoredSidebarWidth(): number {
   return stored >= MIN_SIDEBAR_WIDTH && stored <= MAX_SIDEBAR_WIDTH ? stored : DEFAULT_SIDEBAR_WIDTH;
 }
 
+// location.pathname is NOT decoded by the router, but FileViewerPage reads
+// its path via useParams()['*'], which react-router DOES decode — so a path
+// containing a space, accented character, `#`, or `%` disagrees between the
+// two unless we decode it here too. decodeURIComponent throws on a malformed
+// `%` sequence, so fall back to the raw (still-encoded) string rather than
+// throwing.
+function decodePathSegment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function panelTitle(kind: PanelKind | null): string {
   switch (kind) {
     case 'terminal':
@@ -79,14 +93,18 @@ export function WorkspaceLayout() {
   const gitStatus = useGitStatus(workspaceId, changeTick);
   const statusOfPath = useCallback((path: string) => gitStatus.byPath.get(path)?.status, [gitStatus]);
   const docPrefix = `/w/${workspaceId}/doc/`;
-  const currentPath = location.pathname.startsWith(docPrefix) ? location.pathname.slice(docPrefix.length) : undefined;
+  const currentPath = location.pathname.startsWith(docPrefix)
+    ? decodePathSegment(location.pathname.slice(docPrefix.length))
+    : undefined;
   const navigate = useNavigate();
   const { tabs, ensureTab, promote, close, closeOthers, closeAll } = useTabs(workspaceId);
 
   // The URL is the source of truth for which tab is active; this only makes sure
   // a tab exists for whatever the URL points at. `preview` comes from the link
-  // that navigated here (see TreeView) — a reload or back/forward carries no
-  // state, and the tab is already in the persisted list with its own flag.
+  // that navigated here (see TreeView). Note location.state DOES survive a
+  // reload or back/forward (it lives in history.state) — that's harmless here
+  // because ensureTab is a no-op once the tab already exists, so a stale
+  // preview flag from an earlier navigation is never re-applied.
   useEffect(() => {
     if (!currentPath) return;
     const preview = (location.state as { preview?: boolean } | null)?.preview === true;
@@ -94,8 +112,11 @@ export function WorkspaceLayout() {
   }, [currentPath, location.state, ensureTab]);
 
   const goToTab = useCallback(
-    (path: string) => navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } }),
-    [navigate, workspaceId]
+    (path: string) => {
+      if (path === currentPath) return;
+      navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } });
+    },
+    [currentPath, navigate, workspaceId]
   );
 
   const closeTab = useCallback(
@@ -127,12 +148,25 @@ export function WorkspaceLayout() {
     navigator.clipboard?.writeText(path);
   }, []);
 
-  // Reveal = expand the tree down to the file and make it active; the existing
-  // reveal effect then scrolls the highlighted node into view.
+  // Shared by the once-per-workspace-load reveal effect below and revealTab,
+  // so the two scroll-into-view call sites can't drift apart.
+  const scrollActiveIntoView = useCallback(() => {
+    requestAnimationFrame(() => {
+      sidebarTreeRef.current?.querySelector('.tree-file.active')?.scrollIntoView({ block: 'nearest' });
+    });
+  }, []);
+
+  // Reveal = expand the tree down to the file, make it active if it isn't
+  // already, then scroll the highlighted node into view ourselves. The
+  // once-per-workspace-load reveal effect below is gated so it only runs on
+  // initial load — it cannot be relied on to handle a later, manual Reveal
+  // action (e.g. when the folder is already expanded and the tab already
+  // active, that effect wouldn't rerun at all).
   const revealTab = useCallback((path: string) => {
     expandAncestors(path);
     if (path !== currentPath) navigate(`/w/${workspaceId}/doc/${path}`, { state: { restoreScroll: true } });
-  }, [currentPath, expandAncestors, navigate, workspaceId]);
+    scrollActiveIntoView();
+  }, [currentPath, expandAncestors, navigate, scrollActiveIntoView, workspaceId]);
 
   useEffect(() => {
     currentPathRef.current = currentPath;
@@ -162,10 +196,8 @@ export function WorkspaceLayout() {
     if (!tree || !currentPath || hasRevealedActiveRef.current) return;
     hasRevealedActiveRef.current = true;
     expandAncestors(currentPath);
-    requestAnimationFrame(() => {
-      sidebarTreeRef.current?.querySelector('.tree-file.active')?.scrollIntoView({ block: 'nearest' });
-    });
-  }, [tree, currentPath, expandAncestors]);
+    scrollActiveIntoView();
+  }, [tree, currentPath, expandAncestors, scrollActiveIntoView]);
 
   // Long-lived subscription to live-change events for this workspace. Kept
   // as its own effect (deps: [ds, workspaceId] only) so it doesn't tear down

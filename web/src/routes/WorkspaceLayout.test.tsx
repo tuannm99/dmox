@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { WorkspaceLayout } from './WorkspaceLayout';
 import { DataSourceProvider } from '../datasource/context';
 
@@ -475,5 +476,104 @@ describe('WorkspaceLayout', () => {
     await screen.findByRole('tab', { name: /other\.md/ });
     fireEvent.click(screen.getByRole('button', { name: 'Close other.md' }));
     expect(await screen.findByRole('tab', { name: /guide\.md/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('scrolls the active tab into view every time Reveal in Explorer is used, not just on the initial load', async () => {
+    // Regression test: the reveal effect that scrolls the active tree node into
+    // view is gated by hasRevealedActiveRef and only ever runs once per
+    // workspace load. revealTab's own comment claimed that effect would handle
+    // scrolling for it too, but since it already ran on load, invoking Reveal
+    // again (folder already expanded, tab already active — a total no-op
+    // otherwise) must still scroll the sidebar.
+    //
+    // Filtered to calls made on the sidebar's '.tree-file' node specifically
+    // (via mock.instances, the `this` each call ran against) because the tab
+    // bar itself also calls scrollIntoView (Fix 6) and would otherwise be
+    // counted here too.
+    const scrollIntoViewSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const sidebarRevealCalls = () =>
+      scrollIntoViewSpy.mock.instances.filter((el) => (el as HTMLElement)?.classList?.contains('tree-file')).length;
+
+    renderLayoutAt('/w/ws/doc/local/guide.md');
+    await screen.findByRole('tab', { name: /guide\.md/ });
+    await waitFor(() => expect(sidebarRevealCalls()).toBe(1)); // the once-per-load reveal
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /guide\.md/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in Explorer' }));
+
+    await waitFor(() => expect(sidebarRevealCalls()).toBe(2));
+    scrollIntoViewSpy.mockRestore();
+  });
+
+  it.each([
+    ['my doc.md'],
+    ['tài liệu.md'],
+  ])('does not create a duplicate, mislabelled tab for a percent-encoded path (%s) on a reload-style direct load', async (name) => {
+    const tree = {
+      name: 'WS',
+      path: '',
+      is_dir: true,
+      children: [
+        {
+          name: 'local',
+          path: 'local',
+          is_dir: true,
+          children: [{ name, path: `local/${name}`, is_dir: false }],
+        },
+      ],
+    };
+    const ds = { getTree: vi.fn().mockResolvedValue(tree) };
+    (globalThis as any).__testDataSource = ds;
+    render(
+      <MemoryRouter initialEntries={[`/w/ws/doc/local/${encodeURIComponent(name)}`]}>
+        <Routes>
+          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            <Route path="doc/*" element={<div>doc page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tab = await screen.findByRole('tab', { name: new RegExp(escaped) });
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('does not push a new history entry when clicking the tab that is already active', async () => {
+    function LocationKeySpy({ onKey }: { onKey: (key: string) => void }) {
+      const location = useLocation();
+      useEffect(() => {
+        onKey(location.key);
+      }, [location.key, onKey]);
+      return null;
+    }
+
+    const keys: string[] = [];
+    const ds = { getTree: vi.fn().mockResolvedValue(twoFileTree) };
+    (globalThis as any).__testDataSource = ds;
+    render(
+      <MemoryRouter initialEntries={['/w/ws/doc/local/guide.md']}>
+        <LocationKeySpy onKey={(k) => keys.push(k)} />
+        <Routes>
+          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            <Route index element={<div>welcome</div>} />
+            <Route path="doc/*" element={<div>doc page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('tab', { name: /guide\.md/ });
+    const countBefore = keys.length;
+
+    fireEvent.click(screen.getByRole('tab', { name: /guide\.md/ }));
+    expect(keys.length).toBe(countBefore); // no-op: already the active tab
+
+    // Sanity check the spy actually detects navigations: clicking a genuinely
+    // different tab must still push.
+    fireEvent.click(await screen.findByRole('link', { name: /other\.md/ }));
+    await screen.findByRole('tab', { name: /other\.md/ });
+    expect(keys.length).toBeGreaterThan(countBefore);
   });
 });

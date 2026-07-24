@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Tab } from '../useTabs';
 
 export interface TabBarProps {
@@ -20,6 +20,15 @@ export function TabBar({
   tabs, activePath, onSelect, onClose, onCloseOthers, onCloseAll, onCopyPath, onReveal,
 }: TabBarProps) {
   const [menu, setMenu] = useState<{ path: string; x: number; y: number } | null>(null);
+  const activeTabRef = useRef<HTMLDivElement | null>(null);
+
+  // .tab-bar is overflow-x: auto with no default scroll-following, so a
+  // workspace reopened with many tabs and the active one far to the right
+  // renders it off-screen. Scroll it into view whenever the active tab
+  // changes (including on first mount, e.g. a reload).
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activePath]);
 
   useEffect(() => {
     if (!menu) return;
@@ -45,6 +54,7 @@ export function TabBar({
         return (
           <div
             key={t.path}
+            ref={active ? activeTabRef : undefined}
             role="tab"
             aria-selected={active}
             title={t.path}

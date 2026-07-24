@@ -102,6 +102,15 @@ export function FileViewerPage() {
     setDeleted(false);
   }, [wildcardPath]);
 
+  // The restore-guard above must only block a restore for THIS visit to
+  // wildcardPath (a same-path re-render or live-refetch), never a later
+  // return visit after navigating away and back — otherwise once a path has
+  // been restored once, every subsequent return to it skips the restore and
+  // falls through to resetScroll, snapping the reader back to the top.
+  useEffect(() => {
+    restoredForRef.current = null;
+  }, [wildcardPath]);
+
   // React to a live-change event for the currently-open file (already
   // pre-filtered by WorkspaceLayout to match this file's path). A delete
   // shows a persistent banner; a modify/create refetches in place, clears any

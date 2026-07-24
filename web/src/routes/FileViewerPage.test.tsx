@@ -373,5 +373,88 @@ describe('FileViewerPage', () => {
       expect(view.resetScroll).toHaveBeenCalled();
       expect(view.content().scrollTop).toBe(0);
     });
+
+    it('restores the saved position on the SECOND return to a tab, not just the first (A -> B -> A -> B -> A)', async () => {
+      // Regression test for the bug where restoredForRef, once set for a path,
+      // was never cleared — so a later return visit to that same path (after
+      // bouncing through another tab with no saved offset) had the restore
+      // guard skip the restore and fall through to resetScroll, snapping the
+      // reader back to the top.
+      sessionStorage.clear();
+      (globalThis as any).__testDataSource = {
+        getFile: vi.fn((_ws: string, path: string) =>
+          Promise.resolve({ path, title: path, frontmatter: {}, body: 'body', headings: [], is_ai_context: false })
+        ),
+      };
+
+      function ParentWithTwoTabs() {
+        const contentRef = useRef<HTMLElement>(null);
+        const attach = (node: HTMLElement | null) => {
+          if (node && contentRef.current !== node) {
+            let top = 0;
+            Object.defineProperty(node, 'scrollTop', {
+              get: () => top,
+              set: (v: number) => {
+                top = v;
+              },
+              configurable: true,
+            });
+            (contentRef as { current: HTMLElement | null }).current = node;
+          }
+        };
+        // resetScroll mirrors WorkspaceLayout's real implementation (sets
+        // scrollTop back to 0) rather than being a no-op spy, so the test can
+        // actually distinguish "restored to 900" from "never moved".
+        const resetScroll = () => {
+          if (contentRef.current) contentRef.current.scrollTop = 0;
+        };
+        return (
+          <main className="content" ref={attach}>
+            <Link to="/w/ws/doc/local/a.md" state={{ restoreScroll: true }}>
+              go a
+            </Link>
+            <Link to="/w/ws/doc/local/b.md" state={{ restoreScroll: true }}>
+              go b
+            </Link>
+            <Outlet context={{ tree: undefined, scrollToTop: vi.fn(), resetScroll, contentRef, fileChangeEvent: null }} />
+          </main>
+        );
+      }
+
+      const utils = render(
+        <MemoryRouter initialEntries={['/w/ws/doc/local/a.md']}>
+          <Routes>
+            <Route element={<ParentWithTwoTabs />}>
+              <Route path="/w/:workspaceId/doc/*" element={<FileViewerPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      );
+      const content = () => utils.container.querySelector('.content') as HTMLElement;
+
+      // 1. Read A, scroll to 900.
+      await screen.findByRole('heading', { name: 'local/a.md' });
+      content().scrollTop = 900;
+      fireEvent.scroll(content());
+      await waitFor(() => expect(sessionStorage.getItem('dmox-scroll-ws:local/a.md')).toBe('900'));
+
+      // 2. Switch to B — never scrolled, no saved offset.
+      fireEvent.click(screen.getByRole('link', { name: 'go b' }));
+      await screen.findByRole('heading', { name: 'local/b.md' });
+
+      // 3. Back to A — first return restores 900.
+      fireEvent.click(screen.getByRole('link', { name: 'go a' }));
+      await screen.findByRole('heading', { name: 'local/a.md' });
+      await waitFor(() => expect(content().scrollTop).toBe(900));
+
+      // 4. Switch to B again — still no saved offset for B.
+      fireEvent.click(screen.getByRole('link', { name: 'go b' }));
+      await screen.findByRole('heading', { name: 'local/b.md' });
+
+      // 5. Back to A a SECOND time — must still restore 900, not reset to 0.
+      fireEvent.click(screen.getByRole('link', { name: 'go a' }));
+      await screen.findByRole('heading', { name: 'local/a.md' });
+      await waitFor(() => expect(content().scrollTop).toBe(900));
+    });
   });
 });
