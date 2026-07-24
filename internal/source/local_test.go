@@ -154,6 +154,131 @@ func TestLocalSource_ListNoGitignoreIsUnaffected(t *testing.T) {
 	}
 }
 
+// TestLocalSource_WatchIgnoresPreexistingIgnoredDir covers addRecursive's
+// initial walk: a directory matched by .gitignore that already exists before
+// Watch starts must never get an fsnotify watch registered on it.
+func TestLocalSource_WatchIgnoresPreexistingIgnoredDir(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, ".gitignore"), "node_modules/\n")
+	mustWrite(t, filepath.Join(dir, "node_modules", "dep", "placeholder.txt"), "placeholder")
+	mustWrite(t, filepath.Join(dir, "docs", "readme.md"), "# Readme")
+
+	s := NewLocalSource("local", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events, err := s.Watch(ctx)
+	if err != nil {
+		t.Fatalf("Watch: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond) // let the watcher subscribe before the write
+
+	mustWrite(t, filepath.Join(dir, "node_modules", "dep", "index.js"), "console.log(1)")
+	assertNoEventWithPrefix(t, events, "node_modules/", 1500*time.Millisecond)
+
+	// Positive control: the watcher must still be alive and reporting
+	// non-ignored changes, so the absence above isn't a vacuous pass.
+	mustWrite(t, filepath.Join(dir, "docs", "new.md"), "# New")
+	assertEventForPath(t, events, "docs/new.md", 3*time.Second)
+}
+
+// TestLocalSource_WatchIgnoresNewlyCreatedIgnoredDir covers the runtime path:
+// debounceWatch reacts to an fsnotify Create event for a brand-new directory
+// by calling addRecursive again. That re-walk must resolve paths against the
+// fixed source root (not the newly created directory) so the existing
+// .gitignore patterns still apply to directories created after Watch starts.
+func TestLocalSource_WatchIgnoresNewlyCreatedIgnoredDir(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, ".gitignore"), "node_modules/\n")
+	mustWrite(t, filepath.Join(dir, "docs", "readme.md"), "# Readme")
+
+	s := NewLocalSource("local", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events, err := s.Watch(ctx)
+	if err != nil {
+		t.Fatalf("Watch: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond) // let the watcher subscribe before the write
+
+	// node_modules/ does not exist yet at Watch time - it is created now,
+	// after the watcher is already running.
+	mustWrite(t, filepath.Join(dir, "node_modules", "dep", "index.js"), "console.log(1)")
+	assertNoEventWithPrefix(t, events, "node_modules/", 1500*time.Millisecond)
+
+	// Positive control.
+	mustWrite(t, filepath.Join(dir, "docs", "new.md"), "# New")
+	assertEventForPath(t, events, "docs/new.md", 3*time.Second)
+}
+
+// TestLocalSource_WatchSkipsNewlyCreatedDotDir locks in the current dot-dir
+// guard behavior in the runtime re-walk: a top-level dot-directory created
+// after Watch starts is skipped like everywhere else, rather than being
+// self-exempted and watched.
+func TestLocalSource_WatchSkipsNewlyCreatedDotDir(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "docs", "readme.md"), "# Readme")
+
+	s := NewLocalSource("local", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events, err := s.Watch(ctx)
+	if err != nil {
+		t.Fatalf("Watch: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond) // let the watcher subscribe before the write
+
+	mustWrite(t, filepath.Join(dir, ".hidden", "file.txt"), "secret")
+	assertNoEventWithPrefix(t, events, ".hidden/", 1500*time.Millisecond)
+
+	// Positive control.
+	mustWrite(t, filepath.Join(dir, "docs", "new.md"), "# New")
+	assertEventForPath(t, events, "docs/new.md", 3*time.Second)
+}
+
+// assertNoEventWithPrefix drains events for wait, failing the test if any
+// event's path has the given prefix. Events not matching the prefix are
+// drained and ignored so the wait runs to completion.
+func assertNoEventWithPrefix(t *testing.T, events <-chan ChangeEvent, prefix string, wait time.Duration) {
+	t.Helper()
+	deadline := time.After(wait)
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return
+			}
+			if strings.HasPrefix(ev.Path, prefix) {
+				t.Fatalf("unexpected change event for ignored path: %+v", ev)
+			}
+		case <-deadline:
+			return
+		}
+	}
+}
+
+// assertEventForPath waits up to timeout for a ChangeEvent matching path,
+// draining and ignoring any other events in the meantime.
+func assertEventForPath(t *testing.T, events <-chan ChangeEvent, path string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.After(timeout)
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				t.Fatalf("event channel closed while waiting for change event on %q", path)
+			}
+			if ev.Path == path {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for change event on %q", path)
+		}
+	}
+}
+
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
